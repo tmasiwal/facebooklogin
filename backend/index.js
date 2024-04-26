@@ -1,11 +1,12 @@
 // Import dependencies
 const express = require("express");
 const mongoose = require("mongoose");
+var cors = require("cors");
 require("dotenv").config();
 
 // Create Express app
 const app = express();
-
+app.use(cors());
 // Middleware
 app.use(express.json());
 
