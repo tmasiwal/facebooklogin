@@ -4,18 +4,28 @@ import './App.css'
 
 import {LoginSocialFacebook} from 'reactjs-social-login';
 import { FacebookLoginButton} from "react-social-login-buttons"
+import axios from 'axios';
 function App() {
-  const [count, setCount] = useState(0)
+const handleResolve= (res)=>{
+console.log(res);
+axios.post("http://localhost:3000/login",{
+  name:res.data.name,
+  data:res.data
+});
+  }
+  const handleReject= (res)=>{
+    console.log(res,"Rejected");
+  }
 
   return (
     <>
       <LoginSocialFacebook
-        appId="2369283ed2432262"
+        appId="720133720049880"
         onResolve={(res) => {
-          console.log(res);
+         handleResolve(res);
         }}
         onReject={(res) => {
-          console.log(res);
+          handleReject(res);
         }}
       >
         <FacebookLoginButton />
