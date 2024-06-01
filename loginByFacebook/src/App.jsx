@@ -21,8 +21,9 @@ axios.post("http://localhost:3000/login",{
     <>
       <LoginSocialFacebook
         appId="720133720049880"
+        configId="698924528839003"
         onResolve={(res) => {
-         handleResolve(res);
+          handleResolve(res);
         }}
         onReject={(res) => {
           handleReject(res);
