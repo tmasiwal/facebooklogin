@@ -12,10 +12,7 @@ app.use(express.json());
 
 // MongoDB connection
 mongoose
-  .connect(process.env.MONGODB_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  })
+  .connect(process.env.MONGODB_URI)
   .then(() => {
     console.log("MongoDB connected");
   })
@@ -23,62 +20,66 @@ mongoose
     console.error("MongoDB connection error:", err);
   });
 
-// Define a schema
-const Schema = mongoose.Schema;
-const dataSchema = new Schema({
-  username: String,
-  password: String,
-  email: String,
-  data: Object,
-});
+// // Define a schema
+// const Schema = mongoose.Schema;
+// const dataSchema = new Schema({
+//   username: String,
+//   password: String,
+//   email: String,
+//   data: Object,
+// });
 
-// Create a model
-const Data = mongoose.model("onboarding", dataSchema);
+// // Create a model
+// const Data = mongoose.model("onboarding", dataSchema);
 
 // Routes
+const userRouter= require("./Routes/user.router");
+app.use("/user", userRouter);
+const taskRouter= require("./Routes/task.router")
+app.use("/task", taskRouter);
 // Create data
-app.post("/login", async (req, res) => {
-  try {
-    const newData = new Data(req.body);
-    await newData.save();
-    res.status(200).json(newData);
-  } catch (err) {
-    res.status(400).json({ message: err.message });
-  }
-});
-// Create data
-app.post("/update", async (req, res) => {
-  try {
-    const user = await Data.findOne({ username: req.body.username });
-    console.log(user);
-    if (user) {
-      if (req.body.password == user.password) {
-        await Data.updateOne(
-          { username: user.username },
-          { data: req.body.data }
-        );
-        res.status(200).json({ message: "success" });
-      } else {
-        res.status(404).json({ message: "Wrong username or password" });
-      }
-    } else {
-      res.status(400).json({ message: "no user found please Register first!" });
-    }
-  } catch (err) {
-    res.status(400).json({ message: err.message });
-  }
-});
+// app.post("/login", async (req, res) => {
+//   try {
+//     const newData = new Data(req.body);
+//     await newData.save();
+//     res.status(200).json(newData);
+//   } catch (err) {
+//     res.status(400).json({ message: err.message });
+//   }
+// });
+// // Create data
+// app.post("/update", async (req, res) => {
+//   try {
+//     const user = await Data.findOne({ username: req.body.username });
+//     console.log(user);
+//     if (user) {
+//       if (req.body.password == user.password) {
+//         await Data.updateOne(
+//           { username: user.username },
+//           { data: req.body.data }
+//         );
+//         res.status(200).json({ message: "success" });
+//       } else {
+//         res.status(404).json({ message: "Wrong username or password" });
+//       }
+//     } else {
+//       res.status(400).json({ message: "no user found please Register first!" });
+//     }
+//   } catch (err) {
+//     res.status(400).json({ message: err.message });
+//   }
+// });
 
-// Get all data
-app.get("/clients", async (req, res) => {
-  const { username, password } = req.query;
-  try {
-    const allData = await Data.findOne({ username: username });
-    res.status(200).json(allData);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-});
+// // Get all data
+// app.get("/clients", async (req, res) => {
+//   const { username, password } = req.query;
+//   try {
+//     const allData = await Data.findOne({ username: username });
+//     res.status(200).json(allData);
+//   } catch (err) {
+//     res.status(500).json({ message: err.message });
+//   }
+// });
 
 app.get("/message_templates", async (req, res) => {
   const { wabaID, x_access_token } = req.query; // Corrected destructuring
@@ -140,6 +141,56 @@ app.post("/tp_signup", async (req, res) => {
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
+});
+// Template analytics
+app.get("/template_analytics",async (req, res) => {
+
+    const { wabaID, x_access_token,start,end,granularity="DAILY",template_ids } = req.query; // Corrected destructuring
+    try {
+      const response = await axios.get(
+        `https://interakt-amped-express.azurewebsites.net/api/v17.0/308727328997268?fields=template_analytics.start(${start}).end(${end}).granularity(${granularity}).template_ids${template_ids.join(",")})`,
+        {
+          headers: {
+            "x-access-token": x_access_token,
+            "x-waba-id": wabaID,
+            "Content-Type": "application/json",
+          }, // Corrected headers
+        }
+      );
+      res.status(200).json(response.data); // Sending response data
+    } catch (err) {
+      res.status(500).json({ message: err.message });
+    }
+});
+// Massage analytics
+app.get("/massage_analytics",async (req, res) => {
+
+    const {
+      wabaID,
+      x_access_token,
+      start,
+      end,
+      granularity = "DAY",
+      
+    } = req.query; // Corrected destructuring
+    try {
+      const response = await axios.get(
+        `https://interakt-amped-express.azurewebsites.net/api/v17.0/${wabaID}?fields=analytics.start(${start}).end(${end}).granularity(${granularity})%0A`,
+        {
+          headers: {
+            "x-access-token": x_access_token,
+            "x-waba-id": wabaID,
+            "Content-Type": "application/json",
+          }, // Corrected headers
+        }
+      );
+      res.status(200).json(response.data); // Sending response data
+    } catch (err) {
+      res.status(500).json({ message: err.message });
+    }
+});
+app.all("*", (req, res) => {
+  res.send("no route found");
 });
 // Start the server
 const PORT = process.env.PORT || 3000;
