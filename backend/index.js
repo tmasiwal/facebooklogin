@@ -1,6 +1,7 @@
 // Import dependencies
 const express = require("express");
 const mongoose = require("mongoose");
+
 var cors = require("cors");
 require("dotenv").config();
 const axios = require("axios");
@@ -9,7 +10,7 @@ const app = express();
 app.use(cors());
 // Middleware
 app.use(express.json());
-
+const Contact = require('./Model/contact.model');
 // MongoDB connection
 mongoose
   .connect(process.env.MONGODB_URI)
@@ -35,8 +36,10 @@ mongoose
 // Routes
 const userRouter= require("./Routes/user.router");
 app.use("/user", userRouter);
-const taskRouter= require("./Routes/task.router")
+const taskRouter= require("./Routes/task.router");
+const templateRouter = require("./Routes/template.route");
 app.use("/task", taskRouter);
+app.use("/template",templateRouter);
 // Create data
 // app.post("/login", async (req, res) => {
 //   try {
@@ -81,45 +84,6 @@ app.use("/task", taskRouter);
 //   }
 // });
 
-app.get("/message_templates", async (req, res) => {
-  const { wabaID, x_access_token } = req.query; // Corrected destructuring
-  try {
-    const response = await axios.get(
-      `https://interakt-amped-express.azurewebsites.net/api/v17.0/${wabaID}/message_templates`,
-      {
-        headers: {
-          "x-access-token": x_access_token,
-          "x-waba-id": wabaID,
-          "Content-Type": "application/json",
-        }, // Corrected headers
-      }
-    );
-    res.status(200).json(response.data); // Sending response data
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-});
-app.post("/message_send", async (req, res) => {
-  const { wabaID, x_access_token, phone_number_id } = req.query;
-  const  payload  = req.body;
-  // console.log(payload);
-  try {
-    const response = await axios.post(
-      `https://interakt-amped-express.azurewebsites.net/api/v17.0/${phone_number_id}/messages`,
-      payload,
-      {
-        headers: {
-          "x-access-token": x_access_token,
-          "x-waba-id": wabaID,
-          "Content-Type": "application/json",
-        }, // Corrected headers
-      }
-    );
-    res.status(200).json(response.data); // Sending response data
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-});
 
 app.post("/tp_signup", async (req, res) => {
   const {  x_access_token } = req.query;
@@ -142,53 +106,10 @@ app.post("/tp_signup", async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
-// Template analytics
-app.get("/template_analytics",async (req, res) => {
 
-    const { wabaID, x_access_token,start,end,granularity="DAILY",template_ids } = req.query; // Corrected destructuring
-    try {
-      const response = await axios.get(
-        `https://interakt-amped-express.azurewebsites.net/api/v17.0/308727328997268?fields=template_analytics.start(${start}).end(${end}).granularity(${granularity}).template_ids${template_ids.join(",")})`,
-        {
-          headers: {
-            "x-access-token": x_access_token,
-            "x-waba-id": wabaID,
-            "Content-Type": "application/json",
-          }, // Corrected headers
-        }
-      );
-      res.status(200).json(response.data); // Sending response data
-    } catch (err) {
-      res.status(500).json({ message: err.message });
-    }
-});
-// Massage analytics
-app.get("/massage_analytics",async (req, res) => {
 
-    const {
-      wabaID,
-      x_access_token,
-      start,
-      end,
-      granularity = "DAY",
-      
-    } = req.query; // Corrected destructuring
-    try {
-      const response = await axios.get(
-        `https://interakt-amped-express.azurewebsites.net/api/v17.0/${wabaID}?fields=analytics.start(${start}).end(${end}).granularity(${granularity})%0A`,
-        {
-          headers: {
-            "x-access-token": x_access_token,
-            "x-waba-id": wabaID,
-            "Content-Type": "application/json",
-          }, // Corrected headers
-        }
-      );
-      res.status(200).json(response.data); // Sending response data
-    } catch (err) {
-      res.status(500).json({ message: err.message });
-    }
-});
+
+
 app.all("*", (req, res) => {
   res.send("no route found");
 });
