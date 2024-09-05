@@ -6,7 +6,7 @@ const contactAttributeSchema = new mongoose.Schema({
 });
 
 const contactSchema = new mongoose.Schema({
-  id: { type: Number, required: true },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   name: { type: String, required: true },
   phone: { type: String, required: true },
   dateCreated: { type: Date, default: Date.now },

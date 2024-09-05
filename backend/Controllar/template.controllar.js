@@ -5,7 +5,7 @@ const Template = require('../Model/templent.model');
 const axios = require('axios');
 const TemplateSchedule = require('../Model/TemplateSchedule.model');
 const Contact = require('../Model/contact.model');
-
+const {User}= require("../Model/user.model")
 const getTemplateAnalytics = async (req, res) => {
   const { wabaID, x_access_token, start, end, granularity = "DAILY", template_ids } = req.query;
 
@@ -68,14 +68,30 @@ const getAnalytics = async (req, res) => {
 
 const createContact = async (req, res) => {
   try {
-    const contactData = req.body;
-    const newContact = new Contact(contactData);
-    await newContact.save();
-    res.status(201).json(newContact);
+    const { userId, name, phone, broadcast, sms, contactAttributes } = req.body;
+
+    // Ensure the user exists
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const contact = new Contact({
+      userId,
+      name,
+      phone,
+      broadcast,
+      sms,
+      contactAttributes
+    });
+
+    await contact.save();
+    res.status(201).json(contact);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
+
 
 const scheduleTemplate = async (req, res) => {
   try {
@@ -173,6 +189,100 @@ const sendMessage = async (req, res) => {
 };
 
 
+
+
+const updateContact = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updatedData = req.body;
+
+    const updatedContact = await Contact.findOneAndUpdate({ id }, updatedData, { new: true });
+    if (!updatedContact) {
+      return res.status(404).json({ error: 'Contact not found' });
+    }
+
+    res.status(200).json(updatedContact);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+const deleteContactAttribute = async (req, res) => {
+  try {
+    const { phone, key } = req.params;
+
+    const contact = await Contact.findOne({ phone });
+    if (!contact) {
+      return res.status(404).json({ error: 'Contact not found' });
+    }
+
+    contact.contactAttributes = contact.contactAttributes.filter(attr => attr.key !== key);
+    await contact.save();
+
+    res.status(200).json({ message: 'Contact attribute deleted', contact });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+const deleteContact = async (req, res) => {
+  try {
+    const { phone } = req.params;
+
+    const deletedContact = await Contact.findOneAndDelete({ phone });
+    if (!deletedContact) {
+      return res.status(404).json({ error: 'Contact not found' });
+    }
+
+    res.status(200).json({ message: 'Contact deleted', deletedContact });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+const deleteAllContacts = async (req, res) => {
+  try {
+    await Contact.deleteMany({});
+    res.status(200).json({ message: 'All contacts deleted' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+
+const getAllContacts = async (req, res) => {
+  try {
+    const contacts = await Contact.find({});
+    res.status(200).json(contacts);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+const getContactByPhone = async (req, res) => {
+  try {
+    const { phone } = req.params;
+    const contact = await Contact.findOne({ phone });
+
+    if (!contact) {
+      return res.status(404).json({ error: 'Contact not found' });
+    }
+
+    res.status(200).json(contact);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+const getContactsByUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const contacts = await Contact.find({ userId });
+    res.status(200).json(contacts);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
 module.exports = {
   createTemplate,
   scheduleTemplate,
@@ -180,6 +290,13 @@ module.exports = {
   createContact,
   getTemplateAnalytics,
   getMessageTemplates,
-  sendMessage
+  sendMessage,
+  updateContact,
+  deleteContactAttribute,
+  deleteContact,
+  deleteAllContacts,
+  getAllContacts,
+  getContactByPhone,
+  getContactsByUser
 };
 
