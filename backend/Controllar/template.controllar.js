@@ -7,29 +7,58 @@ const TemplateSchedule = require('../Model/TemplateSchedule.model');
 const Contact = require('../Model/contact.model');
 const {User}= require("../Model/user.model")
 const getTemplateAnalytics = async (req, res) => {
-  const { wabaID, x_access_token, start, end, granularity = "DAILY", template_ids } = req.query;
+  const {
+    wabaID,
+    x_access_token,
+    start,
+    end,
+    granularity = "DAILY",
+    template_ids,
+  } = req.query;
 
   try {
-    const response = await axios.get(
-      `https://interakt-amped-express.azurewebsites.net/api/v17.0/308727328997268?fields=template_analytics.start(${start}).end(${end}).granularity(${granularity}).template_ids${template_ids.join(",")})`,
-      {
-        headers: {
-          "x-access-token": x_access_token,
-          "x-waba-id": wabaID,
-          "Content-Type": "application/json",
-        },
-      }
-    );
+    // Build the 'fields' parameter
+    let fields = `template_analytics.start(${start}).end(${end}).granularity(${granularity})`;
+
+    // Check if template_ids is provided
+    if (template_ids) {
+      // Ensure template_ids is an array
+      let templateIdsArray = Array.isArray(template_ids)
+        ? template_ids
+        : template_ids.split(",");
+
+      let templateIdsString = templateIdsArray.join(",");
+
+      fields += `.template_ids(${templateIdsString})`;
+    }
+
+    // Construct the API endpoint URL
+    const apiUrl = `https://interakt-amped-express.azurewebsites.net/api/v17.0/308727328997268`;
+
+    // Send GET request with query parameters and headers
+    const response = await axios.get(apiUrl, {
+      headers: {
+        "x-access-token": x_access_token,
+        "x-waba-id": wabaID,
+        "Content-Type": "application/json",
+      },
+      params: {
+        fields: fields,
+      },
+    });
 
     res.status(200).json(response.data);
   } catch (err) {
+    // Log the error for debugging
+    console.error(err.response ? err.response.data : err.message);
     res.status(500).json({ message: err.message });
   }
 };
 
+
 const getAnalytics = async (req, res) => {
   try {
-    const { template_analytics, start, end, granularity, template_ids } = req.query;
+    const { template_analytics, start, end, granularity ="DAILY", template_ids } = req.query;
     const fields = `${template_analytics}.start(${start}).end(${end}).granularity(${granularity}).template_ids(${template_ids})`;
 
     const response = await axios.get('https://interakt-amped-express.azurewebsites.net/api/v17.0/308727328997268', {

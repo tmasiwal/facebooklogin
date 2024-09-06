@@ -1,7 +1,7 @@
 // routes/templateRouter.js
 const express = require('express');
 const templateController = require('../Controllar/template.controllar');
-
+const { protect } = require('../Midelware/protact');
 const templateRouter = express.Router();
 // get api start 
 
@@ -9,7 +9,7 @@ templateRouter.get('/template_analytics', templateController.getTemplateAnalytic
 templateRouter.get('/message_templates', templateController.getMessageTemplates);
 templateRouter.post('/createtemplete', templateController.createTemplate);
 templateRouter.get('/analytics', templateController.getAnalytics);
-templateRouter.get('/contacts', templateController.getAllContacts);
+templateRouter.get('/contacts',protect, templateController.getAllContacts);
 templateRouter.get('/contacts/:phone', templateController.getContactByPhone);
 templateRouter.get('/contacts/user/:userId', templateController.getContactsByUser);
 // post api start 
