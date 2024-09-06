@@ -76,7 +76,7 @@ template_ids = template_ids.join(',');
       params: { fields },
     });
 
-    const data = response.data[template_analytics].data[0];
+    const data = response.data["template_analytics"].data[0];
     let allSent = 0, allRead = 0, allClicked = 0, allDelivered = 0;
 
     data.data_points.forEach(point => {
