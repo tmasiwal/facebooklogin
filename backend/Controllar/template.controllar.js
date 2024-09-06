@@ -59,7 +59,12 @@ const getTemplateAnalytics = async (req, res) => {
 const getAnalytics = async (req, res) => {
   try {
     const { start, end, granularity ="DAILY", template_ids } = req.query;
-    template_ids=template_ids.join()
+    if (typeof template_ids === 'string') {
+  template_ids = JSON.parse(template_ids);
+}
+
+// Join the array into a string
+template_ids = template_ids.join(',');
     const fields = `${template_analytics}.start(${start}).end(${end}).granularity(${granularity}).template_ids(${template_ids})`;
 
     const response = await axios.get('https://interakt-amped-express.azurewebsites.net/api/v17.0/308727328997268', {
