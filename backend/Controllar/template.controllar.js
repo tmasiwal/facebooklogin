@@ -65,7 +65,7 @@ const getAnalytics = async (req, res) => {
 
 // Join the array into a string
 template_ids = template_ids.join(',');
-    const fields = `${template_analytics}.start(${start}).end(${end}).granularity(${granularity}).template_ids(${template_ids})`;
+    const fields = `template_analytics.start(${start}).end(${end}).granularity(${granularity}).template_ids(${template_ids})`;
 
     const response = await axios.get('https://interakt-amped-express.azurewebsites.net/api/v17.0/308727328997268', {
       headers: {
