@@ -35,9 +35,9 @@ mongoose
 
 // Routes
 const userRouter= require("./Routes/user.router");
-app.use("/user", userRouter);
 const taskRouter= require("./Routes/task.router");
 const templateRouter = require("./Routes/template.route");
+app.use("/user", userRouter);
 app.use("/task", taskRouter);
 app.use("/template",templateRouter);
 // Create data

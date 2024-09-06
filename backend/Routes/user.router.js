@@ -1,12 +1,13 @@
-const express = require("express");
-const {Login,Update,Clients}= require("../Controllar/user.controllar")
+// const express = require("express");
+// const {Login,Update,Clients,registerUser,loginUser}= require("../Controllar/user.controllar")
+const express = require('express');
+const { registerUser, loginUser } = require('../Controllar/user.controllar');
+const router = express.Router();
 
-const router= express.Router();
+// Register Route
+router.post('/register', registerUser);
 
-router.report("/login")
- .post(Login)
+// Login Route
+router.post('/login', loginUser);
 
- router.report("/update").post(Update);
- router.report("/clients").post(Clients);
-
- module.exports = router;
+module.exports = router;
