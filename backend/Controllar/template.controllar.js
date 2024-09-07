@@ -2,75 +2,91 @@
 
 // controllers/templateController.js
 const Template = require('../Model/templent.model');
+require('dotenv').config();
 const axios = require('axios');
 const TemplateSchedule = require('../Model/TemplateSchedule.model');
 const Contact = require('../Model/contact.model');
 const {User}= require("../Model/user.model")
 const getTemplateAnalytics = async (req, res) => {
-  const {
-    wabaID,
-    x_access_token,
-    start,
-    end,
-    granularity = "DAILY",
-    template_ids,
-  } = req.query;
-
   try {
-    // Build the 'fields' parameter
-    let fields = `template_analytics.start(${start}).end(${end}).granularity(${granularity})`;
+    // Extract start, end, and template_ids from query parameters
+    const { start, end, template_ids } = req.query;
 
-    // Check if template_ids is provided
-    if (template_ids) {
-      // Ensure template_ids is an array
-      let templateIdsArray = Array.isArray(template_ids)
-        ? template_ids
-        : template_ids.split(",");
-
-      let templateIdsString = templateIdsArray.join(",");
-
-      fields += `.template_ids(${templateIdsString})`;
+    // Ensure the necessary query parameters are provided
+    if (!start || !end || !template_ids) {
+      return res.status(400).send({ message: 'Missing required query parameters: start, end, or template_ids' });
     }
 
-    // Construct the API endpoint URL
-    const apiUrl = `https://interakt-amped-express.azurewebsites.net/api/v17.0/308727328997268`;
-
-    // Send GET request with query parameters and headers
-    const response = await axios.get(apiUrl, {
-      headers: {
-        "x-access-token": x_access_token,
-        "x-waba-id": wabaID,
-        "Content-Type": "application/json",
-      },
+    // Make the GET request to the external API
+    const response = await axios.get(`https://interakt-amped-express.azurewebsites.net/api/v17.0/${process.env.WABA_ID}`, {
       params: {
-        fields: fields,
+        fields: `template_analytics.start(${start}).end(${end}).granularity(DAILY).template_ids(${template_ids})`,
       },
+      headers: {
+        'x-waba-id': process.env.WABA_ID,
+        'Content-Type': 'application/json',
+        'x-access-token': process.env.ACCESS_TOKEN,
+      }
     });
 
-    res.status(200).json(response.data);
-  } catch (err) {
-    // Log the error for debugging
-    console.error(err.response ? err.response.data : err.message);
-    res.status(500).json({ message: err.message });
+    // Initialize aggregation variables
+    let allSent = 0, allRead = 0, allClicked = 0, allDelivered = 0;
+
+    // Iterate over the data points in the response to calculate totals
+    response.data.template_analytics.data.forEach(item => {
+      item.data_points.forEach(point => {
+        allSent += point.sent || 0;
+        allRead += point.read || 0;
+        allDelivered += point.delivered || 0;
+
+        // Calculate clicks (if any)
+        if (point.clicked) {
+          allClicked += point.clicked.reduce((acc, click) => acc + click.count, 0);
+        }
+      });
+    });
+
+    // Return aggregated data and original response
+    res.status(200).json({
+      allSent,
+      allRead,
+      allClicked,
+      allDelivered,
+      originalResponse: response.data,  // Original response from API
+    });
+
+  } catch (error) {
+    console.log('Error fetching template analytics:', error.message);
+    res.status(500).send({ message: 'Internal server error' });
   }
 };
 
 
+
+
+
 const getAnalytics = async (req, res) => {
   try {
-    const { template_analytics, start, end, granularity ="DAILY", template_ids } = req.query;
-    const fields = `${template_analytics}.start(${start}).end(${end}).granularity(${granularity}).template_ids(${template_ids})`;
+    const { start, end, template_ids } = req.query;
 
-    const response = await axios.get('https://interakt-amped-express.azurewebsites.net/api/v17.0/308727328997268', {
-      headers: {
-        "x-waba-id": "308727328997268",
-        "x-access-token": "7SFRQSvyqow0hNMOGRkzSAoA5Prwh6JU",
-        "Content-Type": "application/json",
+    // Ensure the necessary query parameters are provided
+    if (!start || !end || !template_ids) {
+      return res.status(400).send({ message: 'Missing required query parameters: start, end, or template_ids' });
+    }
+
+    // Make the GET request to the external API
+    const response = await axios.get(`https://interakt-amped-express.azurewebsites.net/api/v17.0/${process.env.WABA_ID}`, {
+      params: {
+        fields: `template_analytics.start(${start}).end(${end}).granularity(DAILY).template_ids(${template_ids})`,
       },
-      params: { fields },
+      headers: {
+        'x-waba-id': process.env.WABA_ID,
+        'Content-Type': 'application/json',
+        'x-access-token': process.env.ACCESS_TOKEN,
+      }
     });
 
-    const data = response.data[template_analytics].data[0];
+    const data = response.data[0];
     let allSent = 0, allRead = 0, allClicked = 0, allDelivered = 0;
 
     data.data_points.forEach(point => {
@@ -189,11 +205,22 @@ const getMessageTemplates = async (req, res) => {
         },
       }
     );
-    res.status(200).json(response.data);
+
+    // Filter templates where status is "APPROVED" and return their IDs
+    const approvedTemplateIDs = response.data.data
+      .filter(template => template.status === "APPROVED")
+      .map(template => template.id);
+
+    // Return both the approvedTemplateIDs and the original response data
+    res.status(200).json({
+      approvedTemplateIDs,
+      responseData: response.data
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
+
 
 const sendMessage = async (req, res) => {
   const { wabaID, x_access_token, phone_number_id } = req.query;

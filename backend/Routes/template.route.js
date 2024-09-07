@@ -6,13 +6,13 @@ const templateRouter = express.Router();
 // get api start 
 
 templateRouter.get('/template_analytics', templateController.getTemplateAnalytics);
-templateRouter.get('/message_templates', templateController.getMessageTemplates);
-templateRouter.post('/createtemplete', templateController.createTemplate);
+templateRouter.get('/message_templates',protect, templateController.getMessageTemplates);
 templateRouter.get('/analytics', templateController.getAnalytics);
-templateRouter.get('/contacts',protect, templateController.getAllContacts);
+templateRouter.get('/contacts', templateController.getAllContacts);
 templateRouter.get('/contacts/:phone', templateController.getContactByPhone);
 templateRouter.get('/contacts/user/:userId', templateController.getContactsByUser);
 // post api start 
+templateRouter.post('/createtemplete', templateController.createTemplate);
 templateRouter.post('/schedule', templateController.scheduleTemplate);
 templateRouter.post('/contacts', templateController.createContact);
 templateRouter.post('/message_send', templateController.sendMessage );
