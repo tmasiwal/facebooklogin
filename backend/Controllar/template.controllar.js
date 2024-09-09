@@ -98,7 +98,7 @@ template_ids = template_ids.join(',');
     });
 
 
-    const data = response.data[0];
+   
 
     const data = response.data["template_analytics"].data[0];
 
