@@ -67,7 +67,18 @@ const getTemplateAnalytics = async (req, res) => {
 
 const getAnalytics = async (req, res) => {
   try {
+
     const { start, end, template_ids } = req.query;
+
+    let { start, end, granularity ="DAILY", template_ids } = req.query;
+    if (typeof template_ids === 'string') {
+  template_ids = JSON.parse(template_ids);
+}
+
+// Join the array into a string
+template_ids = template_ids.join(',');
+    const fields = `template_analytics.start(${start}).end(${end}).granularity(${granularity}).template_ids(${template_ids})`;
+
 
     // Ensure the necessary query parameters are provided
     if (!start || !end || !template_ids) {
@@ -86,7 +97,11 @@ const getAnalytics = async (req, res) => {
       }
     });
 
+
     const data = response.data[0];
+
+    const data = response.data["template_analytics"].data[0];
+
     let allSent = 0, allRead = 0, allClicked = 0, allDelivered = 0;
 
     data.data_points.forEach(point => {
