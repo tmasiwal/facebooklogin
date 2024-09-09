@@ -68,7 +68,7 @@ const getTemplateAnalytics = async (req, res) => {
 const getAnalytics = async (req, res) => {
   try {
 
-    const { start, end, template_ids } = req.query;
+   
 
     let { start, end, granularity ="DAILY", template_ids } = req.query;
     if (typeof template_ids === 'string') {
