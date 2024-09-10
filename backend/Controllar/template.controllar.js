@@ -2,6 +2,7 @@
 
 // controllers/templateController.js
 const Template = require('../Model/templent.model');
+const KeyAttribute = require('../Model/keyAttribute.model');
 require('dotenv').config();
 const axios = require('axios');
 const TemplateSchedule = require('../Model/TemplateSchedule.model');
@@ -111,6 +112,8 @@ const getAnalytics = async (req, res) => {
   }
 };
 
+
+
 const createContact = async (req, res) => {
   try {
     const { userId, name, phone, broadcast, sms, contactAttributes } = req.body;
@@ -119,6 +122,17 @@ const createContact = async (req, res) => {
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Validate and save unique contact attributes
+    const existingKeys = await KeyAttribute.find({ key: { $in: contactAttributes.map(attr => attr.key) } }).select('key');
+    const existingKeysSet = new Set(existingKeys.map(attr => attr.key));
+
+    const newAttributes = contactAttributes.filter(attr => !existingKeysSet.has(attr.key));
+    
+    // Save new key attributes
+    if (newAttributes.length > 0) {
+      await KeyAttribute.insertMany(newAttributes);
     }
 
     const contact = new Contact({
@@ -131,26 +145,30 @@ const createContact = async (req, res) => {
     });
 
     await contact.save();
-    res.status(201).json(contact);
+    res.status(201).json({"message":"contact create succesfully"});
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
 
+
 const scheduleTemplate = async (req, res) => {
   try {
-    const { templateName, scheduleTime } = req.body;
+    const { userId, broadcastName, templateId, contact, scheduleTime } = req.body;
 
     // Find the template by name
-    const template = await Template.findOne({ name: templateName });
+    const template = await Template.findOne({ _id: templateId });
     if (!template) {
       return res.status(404).json({ message: 'Template not found' });
     }
 
     // Create a new schedule for the template
     const newSchedule = new TemplateSchedule({
-      templateId: template._id,
+      userId,
+      broadcastName,
+      templateId: [template._id], // Store the template's ID in an array
+      contact,                    // Expecting an array of contact numbers
       scheduleTime: new Date(scheduleTime)
     });
 
@@ -161,6 +179,7 @@ const scheduleTemplate = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
 const createTemplate = async (req, res) => {
   const payload = req.body;
 
@@ -249,10 +268,11 @@ const sendMessage = async (req, res) => {
 
 const updateContact = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { _id } = req.params;
     const updatedData = req.body;
+    console.log(updatedData,_id)
 
-    const updatedContact = await Contact.findOneAndUpdate({ id }, updatedData, { new: true });
+    const updatedContact = await Contact.findOneAndUpdate({ _id:_id }, updatedData, { new: true });
     if (!updatedContact) {
       return res.status(404).json({ error: 'Contact not found' });
     }
@@ -265,21 +285,32 @@ const updateContact = async (req, res) => {
 
 const deleteContactAttribute = async (req, res) => {
   try {
-    const { phone, key } = req.params;
+    const { userId, phone, key } = req.params;
 
-    const contact = await Contact.findOne({ phone });
+    // Find the contact with the specific userId and phone
+    const contact = await Contact.findOne({ phone, userId }).select('contactAttributes');
     if (!contact) {
       return res.status(404).json({ error: 'Contact not found' });
     }
 
+    // Check if the attribute exists
+    const attributeExists = contact.contactAttributes.some(attr => attr.key === key);
+    if (!attributeExists) {
+      return res.status(404).json({ error: `Attribute '${key}' not found` });
+    }
+
+    // Remove the specific attribute
     contact.contactAttributes = contact.contactAttributes.filter(attr => attr.key !== key);
+
+    // Save the contact after modification
     await contact.save();
 
-    res.status(200).json({ message: 'Contact attribute deleted', contact });
+    res.status(200).json({ message: `Contact attribute '${key}' deleted`, contact });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
+
 
 const deleteContact = async (req, res) => {
   try {
@@ -339,6 +370,55 @@ const getContactsByUser = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+const getAllContactAttributesByUserId = async (req, res) => {
+  try {
+    const { userId } = req.query;
+
+    // Log the received userId for debugging
+    console.log('Received userId:', userId);
+
+    if (!userId) {
+      return res.status(400).json({ message: 'userId is required in query parameters' });
+    }
+
+    // Find all contacts for the given userId and return only the contactAttributes field
+    const contacts = await Contact.find({ userId })
+    console.log(contacts)
+
+    // Log the retrieved contacts for debugging
+    console.log('Contacts found:', contacts);
+
+    if (!contacts || contacts.length === 0) {
+      return res.status(404).json({ message: 'No contacts found for this user' });
+    }
+
+    // Extract contactAttributes from each contact and put them in an array
+    const allContactAttributes = contacts.map(contact => contact.contactAttributes).flat();
+
+    res.status(200).json({ contactAttributes: allContactAttributes });
+  } catch (error) {
+    console.error('Error in fetching contacts:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+const getAllUniqueAttributes = async (req, res) => {
+  try {
+    // Retrieve all key attributes from the KeyAttribute model
+    const uniqueAttributes = await KeyAttribute.find({}).select('key value');
+
+    // Check if no attributes are found
+    if (uniqueAttributes.length === 0) {
+      return res.status(404).json({ message: 'No unique attributes found' });
+    }
+
+    // Return the list of unique attributes
+    res.status(200).json({ uniqueAttributes });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
 module.exports = {
   createTemplate,
   scheduleTemplate,
@@ -353,6 +433,8 @@ module.exports = {
   deleteAllContacts,
   getAllContacts,
   getContactByPhone,
-  getContactsByUser
+  getContactsByUser,
+  getAllContactAttributesByUserId,
+  getAllUniqueAttributes
 };
 
