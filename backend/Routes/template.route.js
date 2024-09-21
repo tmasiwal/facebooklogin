@@ -6,7 +6,7 @@ const templateRouter = express.Router();
 // get api start 
 
 templateRouter.get('/template_analytics', templateController.getTemplateAnalytics);
-templateRouter.get('/message_templates',protect, templateController.getMessageTemplates);
+templateRouter.get('/message_templates', templateController.getMessageTemplates);
 templateRouter.get('/analytics', templateController.getAnalytics);
 templateRouter.get('/contacts', templateController.getAllContacts);
 templateRouter.get('/contacts/:phone', templateController.getContactByPhone);
@@ -21,12 +21,14 @@ templateRouter.post('/message_send', templateController.sendMessage );
 // put api start 
 
 templateRouter.put('/updatecontact/:_id',templateController.updateContact);
+templateRouter.put('/update_schedule/:broadcastId',templateController.updateBroadcast);
 
 // delete api start 
 
 templateRouter.delete('/contacts/:userId/:phone/attributes/:key', templateController.deleteContactAttribute);
 templateRouter.delete('/contacts/:phone', templateController.deleteContact);
 templateRouter.delete('/contacts', templateController.deleteAllContacts);
+templateRouter.delete('/delete_broadcast/:broadcastId', templateController.deleteBroadcast)
 module.exports = templateRouter;
 
 

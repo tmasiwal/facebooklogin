@@ -153,28 +153,23 @@ const createContact = async (req, res) => {
 
 
 
+
 const scheduleTemplate = async (req, res) => {
   try {
-    const { userId, broadcastName, templateId, contact, scheduleTime } = req.body;
+    const { userId, broadcastName, templateId, contact, scheduleTime,contactAttributes } = req.body;
 
-    // Find the template by name
-    const template = await Template.findOne({ _id: templateId });
-    if (!template) {
-      return res.status(404).json({ message: 'Template not found' });
-    }
-
-    // Create a new schedule for the template
     const newSchedule = new TemplateSchedule({
       userId,
       broadcastName,
-      templateId: [template._id], // Store the template's ID in an array
-      contact,                    // Expecting an array of contact numbers
-      scheduleTime: new Date(scheduleTime)
+      templateId: templateId, 
+      contact:contact, 
+      contactAttributes:contactAttributes,                   
+      scheduleTime: scheduleTime
     });
 
     await newSchedule.save();
 
-    res.status(201).json({ message: 'Template scheduled successfully', schedule: newSchedule });
+    res.status(201).json({"message":"contact scheduleTemplate succesfully"});
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -242,27 +237,69 @@ const getMessageTemplates = async (req, res) => {
 
 
 const sendMessage = async (req, res) => {
-  const { wabaID, x_access_token, phone_number_id } = req.query;
-  const payload = req.body;
+  // const { wabaID, x_access_token, phone_number_id } = req.query;
+  const payload =  {
+    messaging_product: "whatsapp",
+    to: "919522189879",
+    type: "text",
+    text: {
+      body: "hii"  // Message content
+    }
+  };
 
+  // const template = await Template.findOne({ _id: templateId });
+  //   if (!template) {
+  //     return res.status(404).json({ message: 'Template not found' });
+  //   }
+  //   if(template){
+
+  //     console.log("line no 167",template)
+  //     // const existingKeys = await KeyAttribute.find({ key: { $in: contactAttributes.map(attr => attr.key) } }).select('key');
+  //     // console.log(existingKeys)
+    
+  //     for(let i=0;i<contact.length;i++){
+  //       const payload =  {
+  //         messaging_product: "whatsapp",
+  //         to: contact[i],
+  //         type: "text",
+  //         text: {
+  //           body: "hii"  
+  //         }
+  //       };
+  //       let datares = await axios.post(
+  //         `https://interakt-amped-express.azurewebsites.net/api/v17.0/331012110095607/messages`,
+  //         payload,
+  //         {
+  //           headers: {
+  //             "x-access-token": process.env.ACCESS_TOKEN,
+  //             "x-waba-id": process.env.WABA_ID,
+  //             "Content-Type": "application/json",
+  //           },
+  //         }
+  //       );
+  //       console.log(datares.status)
+  //     }
+  //     res.status(201).json({ message: 'Template scheduled successfully'});
+
+  //   }
   try {
     const response = await axios.post(
-      `https://interakt-amped-express.azurewebsites.net/api/v17.0/${phone_number_id}/messages`,
+      `https://interakt-amped-express.azurewebsites.net/api/v17.0/331012110095607/messages`,
       payload,
       {
         headers: {
-          "x-access-token": x_access_token,
-          "x-waba-id": wabaID,
+          "x-access-token": process.env.ACCESS_TOKEN,
+          "x-waba-id": process.env.WABA_ID,
           "Content-Type": "application/json",
         },
       }
     );
     res.status(200).json(response.data);
   } catch (err) {
+    console.error("Error sending message:", err);
     res.status(500).json({ message: err.message });
   }
 };
-
 
 
 
@@ -419,6 +456,68 @@ const getAllUniqueAttributes = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+const updateBroadcast = async (req, res) => {
+  const { broadcastId } = req.params; // Get broadcast ID from URL params
+  const { newScheduleTime, newBroadcastName } = req.body; // Get new schedule time and new broadcast name from request body
+
+  try {
+    // Find the broadcast by ID
+    const broadcast = await TemplateSchedule.findById(broadcastId);
+
+    // If broadcast not found, return 404 error
+    if (!broadcast) {
+      return res.status(404).json({ message: 'Broadcast not found' });
+    }
+
+    // Check if the status is 'pending'
+    if (broadcast.status !== 'scheduled') {
+      return res.status(400).json({ message: 'Can only update broadcasts with status "scheduled"' });
+    }
+
+    // Update scheduleTime and broadcastName if the status is 'pending'
+    const updatedBroadcast = await TemplateSchedule.findByIdAndUpdate(
+      broadcastId,
+      {
+        scheduleTime: newScheduleTime,
+        broadcastName: newBroadcastName
+      },
+      { new: true } // Return the updated document
+    );
+
+    // Respond with success message and updated document
+    return res.status(200).json({
+      message: 'Schedule time and broadcast name updated successfully',
+      updatedBroadcast
+    });
+  } catch (error) {
+    // Handle errors during the update process
+    return res.status(500).json({
+      message: 'Error updating broadcast',
+      error: error.message
+    });
+  }
+};
+
+const deleteBroadcast = async (req, res) => {
+  const { broadcastId } = req.params; // Get broadcast ID from URL parameters
+
+  try {
+    // Find the broadcast by ID and delete it
+    const deletedBroadcast = await TemplateSchedule.findByIdAndDelete(broadcastId);
+
+    // If the broadcast is not found, return a 404 error
+    if (!deletedBroadcast) {
+      return res.status(404).json({ message: 'Broadcast not found' });
+    }
+
+    // If the broadcast was deleted, return a success message
+    return res.status(200).json({ message: 'Broadcast deleted successfully' });
+  } catch (error) {
+    // Handle errors during the delete process
+    return res.status(500).json({ message: 'Error deleting broadcast', error: error.message });
+  }
+};
 module.exports = {
   createTemplate,
   scheduleTemplate,
@@ -435,6 +534,8 @@ module.exports = {
   getContactByPhone,
   getContactsByUser,
   getAllContactAttributesByUserId,
-  getAllUniqueAttributes
+  getAllUniqueAttributes,
+  updateBroadcast,
+  deleteBroadcast
 };
 
