@@ -4,6 +4,8 @@ const mongoose = require("mongoose");
 var cors = require("cors");
 require("dotenv").config();
 const axios = require("axios");
+const cron = require("node-cron");
+const {Task}= require("./Model/task.model")
 // Create Express app
 const app = express();
 app.use(cors());
@@ -80,7 +82,29 @@ app.use("/task", taskRouter);
 //     res.status(500).json({ message: err.message });
 //   }
 // });
+cron.schedule("* * * * *", async () => {
+  // Runs every minute
+  const now = new Date();
+  console.log(now.toString());
+  try {
+    const dueTasks = await Task.find({
+      scheduledTime: { $lte: now },
+      status: "pending",
+    });
 
+    for (const task of dueTasks) {
+      // Execute the task
+      console.log(
+        `Executing action for ${task.username} at ${task.scheduledTime}`
+      );
+      // Update task status
+      task.status = "completed";
+      await task.save();
+    }
+  } catch (err) {
+    console.error("Error fetching or executing tasks:", err);
+  }
+});
 app.get("/message_templates", async (req, res) => {
   const { wabaID, x_access_token } = req.query; // Corrected destructuring
   try {
@@ -120,7 +144,27 @@ app.post("/message_send", async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
-
+app.post("/create_templates", async (req, res) => {
+  const { wabaID, x_access_token } = req.query;
+  const payload = req.body;
+  // console.log(payload);
+  try {
+    const response = await axios.post(
+      `https://interakt-amped-express.azurewebsites.net/api/v17.0/${wabaID}/message_templates`,
+      payload,
+      {
+        headers: {
+          "x-access-token": x_access_token,
+          "x-waba-id": wabaID,
+          "Content-Type": "application/json",
+        }, // Corrected headers
+      }
+    );
+    res.status(200).json(response.data); // Sending response data
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
 app.post("/tp_signup", async (req, res) => {
   const {  x_access_token } = req.query;
   const payload = req.body;
