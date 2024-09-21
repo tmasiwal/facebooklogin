@@ -1,6 +1,9 @@
 // Import dependencies
 const express = require("express");
 const mongoose = require("mongoose");
+const TemplateSchedule = require('./Model/TemplateSchedule.model');
+const cron = require('node-cron');
+const Template = require('./Model/templent.model'); 
 var cors = require("cors");
 require("dotenv").config();
 const axios = require("axios");
@@ -11,7 +14,7 @@ const app = express();
 app.use(cors());
 // Middleware
 app.use(express.json());
-
+const Contact = require('./Model/contact.model');
 // MongoDB connection
 mongoose
   .connect(process.env.MONGODB_URI)
@@ -36,9 +39,11 @@ mongoose
 
 // Routes
 const userRouter= require("./Routes/user.router");
+const taskRouter= require("./Routes/task.router");
+const templateRouter = require("./Routes/template.route");
 app.use("/user", userRouter);
-const taskRouter= require("./Routes/task.router")
 app.use("/task", taskRouter);
+app.use("/template",templateRouter);
 // Create data
 // app.post("/login", async (req, res) => {
 //   try {
@@ -82,89 +87,8 @@ app.use("/task", taskRouter);
 //     res.status(500).json({ message: err.message });
 //   }
 // });
-cron.schedule("* * * * *", async () => {
-  // Runs every minute
-  const now = new Date();
-  console.log(now.toString());
-  try {
-    const dueTasks = await Task.find({
-      scheduledTime: { $lte: now },
-      status: "pending",
-    });
 
-    for (const task of dueTasks) {
-      // Execute the task
-      console.log(
-        `Executing action for ${task.username} at ${task.scheduledTime}`
-      );
-      // Update task status
-      task.status = "completed";
-      await task.save();
-    }
-  } catch (err) {
-    console.error("Error fetching or executing tasks:", err);
-  }
-});
-app.get("/message_templates", async (req, res) => {
-  const { wabaID, x_access_token } = req.query; // Corrected destructuring
-  try {
-    const response = await axios.get(
-      `https://interakt-amped-express.azurewebsites.net/api/v17.0/${wabaID}/message_templates`,
-      {
-        headers: {
-          "x-access-token": x_access_token,
-          "x-waba-id": wabaID,
-          "Content-Type": "application/json",
-        }, // Corrected headers
-      }
-    );
-    res.status(200).json(response.data); // Sending response data
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-});
-app.post("/message_send", async (req, res) => {
-  const { wabaID, x_access_token, phone_number_id } = req.query;
-  const  payload  = req.body;
-  // console.log(payload);
-  try {
-    const response = await axios.post(
-      `https://interakt-amped-express.azurewebsites.net/api/v17.0/${phone_number_id}/messages`,
-      payload,
-      {
-        headers: {
-          "x-access-token": x_access_token,
-          "x-waba-id": wabaID,
-          "Content-Type": "application/json",
-        }, // Corrected headers
-      }
-    );
-    res.status(200).json(response.data); // Sending response data
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-});
-app.post("/create_templates", async (req, res) => {
-  const { wabaID, x_access_token } = req.query;
-  const payload = req.body;
-  // console.log(payload);
-  try {
-    const response = await axios.post(
-      `https://interakt-amped-express.azurewebsites.net/api/v17.0/${wabaID}/message_templates`,
-      payload,
-      {
-        headers: {
-          "x-access-token": x_access_token,
-          "x-waba-id": wabaID,
-          "Content-Type": "application/json",
-        }, // Corrected headers
-      }
-    );
-    res.status(200).json(response.data); // Sending response data
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-});
+
 app.post("/tp_signup", async (req, res) => {
   const {  x_access_token } = req.query;
   const payload = req.body;
@@ -186,53 +110,115 @@ app.post("/tp_signup", async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
-// Template analytics
-app.get("/template_analytics",async (req, res) => {
 
-    const { wabaID, x_access_token,start,end,granularity="DAILY",template_ids } = req.query; // Corrected destructuring
-    try {
-      const response = await axios.get(
-        `https://interakt-amped-express.azurewebsites.net/api/v17.0/308727328997268?fields=template_analytics.start(${start}).end(${end}).granularity(${granularity}).template_ids${template_ids.join(",")})`,
-        {
-          headers: {
-            "x-access-token": x_access_token,
-            "x-waba-id": wabaID,
-            "Content-Type": "application/json",
-          }, // Corrected headers
-        }
-      );
-      res.status(200).json(response.data); // Sending response data
-    } catch (err) {
-      res.status(500).json({ message: err.message });
+async function sendWhatsAppMessage(contact, messageBody) {
+  const payload = {
+    messaging_product: "whatsapp",
+    to: contact,
+    type: "text",
+    text: {
+      body: messageBody
     }
-});
-// Massage analytics
-app.get("/massage_analytics",async (req, res) => {
+  };
 
-    const {
-      wabaID,
-      x_access_token,
-      start,
-      end,
-      granularity = "DAY",
-      
-    } = req.query; // Corrected destructuring
-    try {
-      const response = await axios.get(
-        `https://interakt-amped-express.azurewebsites.net/api/v17.0/${wabaID}?fields=analytics.start(${start}).end(${end}).granularity(${granularity})%0A`,
-        {
-          headers: {
-            "x-access-token": x_access_token,
-            "x-waba-id": wabaID,
-            "Content-Type": "application/json",
-          }, // Corrected headers
-        }
-      );
-      res.status(200).json(response.data); // Sending response data
-    } catch (err) {
-      res.status(500).json({ message: err.message });
+  try {
+    const response = await axios.post(
+      `https://interakt-amped-express.azurewebsites.net/api/v17.0/331012110095607/messages`,
+      payload,
+      {
+        headers: {
+          "x-access-token": process.env.ACCESS_TOKEN,
+          "x-waba-id": process.env.WABA_ID,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    console.log(`Message sent to ${contact}: Status ${response.status}`);
+    return true;
+  } catch (error) {
+    console.error(`Failed to send message to ${contact}:`, error.message);
+    return false;
+  }
+}
+
+// Cron job that runs every minute to process scheduled broadcasts
+cron.schedule('* * * * *', async () => {
+  console.log('Checking for scheduled broadcasts...');
+
+function formatDateToIST(date) {
+    // Convert to Indian Standard Time (IST)
+    const options = {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+        timeZone: 'Asia/Kolkata'
+    };
+    
+    // Format date in IST
+    const istDate = new Intl.DateTimeFormat('en-GB', options).format(date);
+
+    // Reformat to desired ISO-like format
+    const [day, month, year, hour, minute] = istDate.split(/[\s,/:]+/);
+    return `${year}-${month}-${day}T${hour}:${minute}`;
+}
+
+const now = new Date();
+console.log(formatDateToIST(now));
+  try {
+    // Find all broadcasts that are scheduled to be sent and haven't been completed yet
+    const broadcasts = await TemplateSchedule.find({
+      status: 'scheduled',
+      scheduleTime:  formatDateToIST(now)
+    });
+    
+   console.log(broadcasts)
+    if (broadcasts.length === 0) {
+      console.log('No broadcasts to process');
+      return;
     }
+  
+    // Loop through each broadcast
+    for (const broadcast of broadcasts) {
+      // Check if the template is populated and contains valid data
+      // if (!broadcast.templateId || broadcast.templateId.length === 0) {
+      //   console.log(`No valid template found for broadcast ID: ${broadcast._id}`);
+      //   continue;
+      // }
+
+      const template = broadcast.templateId 
+      const messageBody = template.text || "Hello welcome to AiBaat"; 
+
+      console.log(`Processing broadcast: ${broadcast._id}, Message: ${messageBody}`);
+      let statusshedule = false
+      // Send message to each contact
+      for (const contact of broadcast.contact) {
+        const success = await sendWhatsAppMessage(contact, messageBody);
+
+        if (success) {
+          console.log(`Message sent successfully to ${contact}`);
+          statusshedule= true
+        } else {
+          console.log(`Failed to send message to ${contact}`);
+        }
+      }
+      if(statusshedule){
+        broadcast.status = 'completed';
+        await broadcast.save();
+        console.log(`Broadcast ${broadcast._id} marked as completed`);
+      }else{
+        continue;
+      }
+     
+    }
+
+  } catch (error) {
+    console.error('Error processing broadcasts:', error.message);
+  }
 });
+
 app.all("*", (req, res) => {
   res.send("no route found");
 });
