@@ -6,7 +6,7 @@ const templateRouter = express.Router();
 // get api start 
 
 templateRouter.get('/template_analytics', templateController.getTemplateAnalytics);
-templateRouter.get('/message_templates',protect, templateController.getMessageTemplates);
+templateRouter.get('/message_templates', templateController.getMessageTemplates);
 templateRouter.get('/analytics', templateController.getAnalytics);
 templateRouter.get('/contacts', templateController.getAllContacts);
 templateRouter.get('/contacts/:phone', templateController.getContactByPhone);
