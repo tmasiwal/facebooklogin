@@ -2,6 +2,7 @@
 
 // controllers/templateController.js
 const Template = require('../Model/templent.model');
+const KeyAttribute = require('../Model/keyAttribute.model');
 require('dotenv').config();
 const axios = require('axios');
 const TemplateSchedule = require('../Model/TemplateSchedule.model');
@@ -68,17 +69,7 @@ const getTemplateAnalytics = async (req, res) => {
 const getAnalytics = async (req, res) => {
   try {
 
-   
-
-    let { start, end, granularity ="DAILY", template_ids } = req.query;
-    if (typeof template_ids === 'string') {
-  template_ids = JSON.parse(template_ids);
-}
-
-// Join the array into a string
-template_ids = template_ids.join(',');
-    const fields = `template_analytics.start(${start}).end(${end}).granularity(${granularity}).template_ids(${template_ids})`;
-
+    const { start, end, template_ids } = req.query;
 
     // Ensure the necessary query parameters are provided
     if (!start || !end || !template_ids) {
@@ -96,11 +87,6 @@ template_ids = template_ids.join(',');
         'x-access-token': process.env.ACCESS_TOKEN,
       }
     });
-
-
-   
-
-    const data = response.data["template_analytics"].data[0];
 
     let allSent = 0, allRead = 0, allClicked = 0, allDelivered = 0;
 
@@ -126,6 +112,8 @@ template_ids = template_ids.join(',');
   }
 };
 
+
+
 const createContact = async (req, res) => {
   try {
     const { userId, name, phone, broadcast, sms, contactAttributes } = req.body;
@@ -134,6 +122,17 @@ const createContact = async (req, res) => {
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Validate and save unique contact attributes
+    const existingKeys = await KeyAttribute.find({ key: { $in: contactAttributes.map(attr => attr.key) } }).select('key');
+    const existingKeysSet = new Set(existingKeys.map(attr => attr.key));
+
+    const newAttributes = contactAttributes.filter(attr => !existingKeysSet.has(attr.key));
+    
+    // Save new key attributes
+    if (newAttributes.length > 0) {
+      await KeyAttribute.insertMany(newAttributes);
     }
 
     const contact = new Contact({
@@ -146,36 +145,36 @@ const createContact = async (req, res) => {
     });
 
     await contact.save();
-    res.status(201).json(contact);
+    res.status(201).json({"message":"contact create succesfully"});
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
 
+
+
 const scheduleTemplate = async (req, res) => {
   try {
-    const { templateName, scheduleTime } = req.body;
+    const { userId, broadcastName, templateId, contact, scheduleTime,contactAttributes } = req.body;
 
-    // Find the template by name
-    const template = await Template.findOne({ name: templateName });
-    if (!template) {
-      return res.status(404).json({ message: 'Template not found' });
-    }
-
-    // Create a new schedule for the template
     const newSchedule = new TemplateSchedule({
-      templateId: template._id,
-      scheduleTime: new Date(scheduleTime)
+      userId,
+      broadcastName,
+      templateId: templateId, 
+      contact:contact, 
+      contactAttributes:contactAttributes,                   
+      scheduleTime: scheduleTime
     });
 
     await newSchedule.save();
 
-    res.status(201).json({ message: 'Template scheduled successfully', schedule: newSchedule });
+    res.status(201).json({"message":"contact scheduleTemplate succesfully"});
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
+
 const createTemplate = async (req, res) => {
   const payload = req.body;
 
@@ -238,36 +237,81 @@ const getMessageTemplates = async (req, res) => {
 
 
 const sendMessage = async (req, res) => {
-  const { wabaID, x_access_token, phone_number_id } = req.query;
-  const payload = req.body;
+  // const { wabaID, x_access_token, phone_number_id } = req.query;
+  const payload =  {
+    messaging_product: "whatsapp",
+    to: "919522189879",
+    type: "text",
+    text: {
+      body: "hii"  // Message content
+    }
+  };
 
+  // const template = await Template.findOne({ _id: templateId });
+  //   if (!template) {
+  //     return res.status(404).json({ message: 'Template not found' });
+  //   }
+  //   if(template){
+
+  //     console.log("line no 167",template)
+  //     // const existingKeys = await KeyAttribute.find({ key: { $in: contactAttributes.map(attr => attr.key) } }).select('key');
+  //     // console.log(existingKeys)
+    
+  //     for(let i=0;i<contact.length;i++){
+  //       const payload =  {
+  //         messaging_product: "whatsapp",
+  //         to: contact[i],
+  //         type: "text",
+  //         text: {
+  //           body: "hii"  
+  //         }
+  //       };
+  //       let datares = await axios.post(
+  //         `https://interakt-amped-express.azurewebsites.net/api/v17.0/331012110095607/messages`,
+  //         payload,
+  //         {
+  //           headers: {
+  //             "x-access-token": process.env.ACCESS_TOKEN,
+  //             "x-waba-id": process.env.WABA_ID,
+  //             "Content-Type": "application/json",
+  //           },
+  //         }
+  //       );
+  //       console.log(datares.status)
+  //     }
+  //     res.status(201).json({ message: 'Template scheduled successfully'});
+
+  //   }
   try {
     const response = await axios.post(
-      `https://interakt-amped-express.azurewebsites.net/api/v17.0/${phone_number_id}/messages`,
+      `https://interakt-amped-express.azurewebsites.net/api/v17.0/331012110095607/messages`,
       payload,
       {
         headers: {
-          "x-access-token": x_access_token,
-          "x-waba-id": wabaID,
+          "x-access-token": process.env.ACCESS_TOKEN,
+          "x-waba-id": process.env.WABA_ID,
           "Content-Type": "application/json",
         },
       }
     );
     res.status(200).json(response.data);
   } catch (err) {
+    console.error("Error sending message:", err);
     res.status(500).json({ message: err.message });
   }
 };
 
 
 
-
 const updateContact = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { _id } = req.params;
     const updatedData = req.body;
+    console.log(updatedData,_id)
 
-    const updatedContact = await Contact.findOneAndUpdate({ _id,id }, updatedData, { new: true });
+
+    const updatedContact = await Contact.findOneAndUpdate({ _id:_id }, updatedData, { new: true });
+
     if (!updatedContact) {
       return res.status(404).json({ error: 'Contact not found' });
     }
@@ -280,21 +324,32 @@ const updateContact = async (req, res) => {
 
 const deleteContactAttribute = async (req, res) => {
   try {
-    const { phone, key } = req.params;
+    const { userId, phone, key } = req.params;
 
-    const contact = await Contact.findOne({ phone });
+    // Find the contact with the specific userId and phone
+    const contact = await Contact.findOne({ phone, userId }).select('contactAttributes');
     if (!contact) {
       return res.status(404).json({ error: 'Contact not found' });
     }
 
+    // Check if the attribute exists
+    const attributeExists = contact.contactAttributes.some(attr => attr.key === key);
+    if (!attributeExists) {
+      return res.status(404).json({ error: `Attribute '${key}' not found` });
+    }
+
+    // Remove the specific attribute
     contact.contactAttributes = contact.contactAttributes.filter(attr => attr.key !== key);
+
+    // Save the contact after modification
     await contact.save();
 
-    res.status(200).json({ message: 'Contact attribute deleted', contact });
+    res.status(200).json({ message: `Contact attribute '${key}' deleted`, contact });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
+
 
 const deleteContact = async (req, res) => {
   try {
@@ -354,6 +409,117 @@ const getContactsByUser = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+const getAllContactAttributesByUserId = async (req, res) => {
+  try {
+    const { userId } = req.query;
+
+    // Log the received userId for debugging
+    console.log('Received userId:', userId);
+
+    if (!userId) {
+      return res.status(400).json({ message: 'userId is required in query parameters' });
+    }
+
+    // Find all contacts for the given userId and return only the contactAttributes field
+    const contacts = await Contact.find({ userId })
+    console.log(contacts)
+
+    // Log the retrieved contacts for debugging
+    console.log('Contacts found:', contacts);
+
+    if (!contacts || contacts.length === 0) {
+      return res.status(404).json({ message: 'No contacts found for this user' });
+    }
+
+    // Extract contactAttributes from each contact and put them in an array
+    const allContactAttributes = contacts.map(contact => contact.contactAttributes).flat();
+
+    res.status(200).json({ contactAttributes: allContactAttributes });
+  } catch (error) {
+    console.error('Error in fetching contacts:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+const getAllUniqueAttributes = async (req, res) => {
+  try {
+    // Retrieve all key attributes from the KeyAttribute model
+    const uniqueAttributes = await KeyAttribute.find({}).select('key value');
+
+    // Check if no attributes are found
+    if (uniqueAttributes.length === 0) {
+      return res.status(404).json({ message: 'No unique attributes found' });
+    }
+
+    // Return the list of unique attributes
+    res.status(200).json({ uniqueAttributes });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+const updateBroadcast = async (req, res) => {
+  const { broadcastId } = req.params; // Get broadcast ID from URL params
+  const { newScheduleTime, newBroadcastName } = req.body; // Get new schedule time and new broadcast name from request body
+
+  try {
+    // Find the broadcast by ID
+    const broadcast = await TemplateSchedule.findById(broadcastId);
+
+    // If broadcast not found, return 404 error
+    if (!broadcast) {
+      return res.status(404).json({ message: 'Broadcast not found' });
+    }
+
+    // Check if the status is 'pending'
+    if (broadcast.status !== 'scheduled') {
+      return res.status(400).json({ message: 'Can only update broadcasts with status "scheduled"' });
+    }
+
+    // Update scheduleTime and broadcastName if the status is 'pending'
+    const updatedBroadcast = await TemplateSchedule.findByIdAndUpdate(
+      broadcastId,
+      {
+        scheduleTime: newScheduleTime,
+        broadcastName: newBroadcastName
+      },
+      { new: true } // Return the updated document
+    );
+
+    // Respond with success message and updated document
+    return res.status(200).json({
+      message: 'Schedule time and broadcast name updated successfully',
+      updatedBroadcast
+    });
+  } catch (error) {
+    // Handle errors during the update process
+    return res.status(500).json({
+      message: 'Error updating broadcast',
+      error: error.message
+    });
+  }
+};
+
+const deleteBroadcast = async (req, res) => {
+  const { broadcastId } = req.params; // Get broadcast ID from URL parameters
+
+  try {
+    // Find the broadcast by ID and delete it
+    const deletedBroadcast = await TemplateSchedule.findByIdAndDelete(broadcastId);
+
+    // If the broadcast is not found, return a 404 error
+    if (!deletedBroadcast) {
+      return res.status(404).json({ message: 'Broadcast not found' });
+    }
+
+    // If the broadcast was deleted, return a success message
+    return res.status(200).json({ message: 'Broadcast deleted successfully' });
+  } catch (error) {
+    // Handle errors during the delete process
+    return res.status(500).json({ message: 'Error deleting broadcast', error: error.message });
+  }
+};
 module.exports = {
   createTemplate,
   scheduleTemplate,
@@ -368,6 +534,10 @@ module.exports = {
   deleteAllContacts,
   getAllContacts,
   getContactByPhone,
-  getContactsByUser
+  getContactsByUser,
+  getAllContactAttributesByUserId,
+  getAllUniqueAttributes,
+  updateBroadcast,
+  deleteBroadcast
 };
 
