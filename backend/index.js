@@ -7,7 +7,7 @@ const Template = require('./Model/templent.model');
 var cors = require("cors");
 require("dotenv").config();
 const axios = require("axios");
-const cron = require("node-cron");
+
 const {Task}= require("./Model/task.model")
 // Create Express app
 const app = express();
