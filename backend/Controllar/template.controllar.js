@@ -68,6 +68,7 @@ const getTemplateAnalytics = async (req, res) => {
 
 const getAnalytics = async (req, res) => {
   try {
+
     const { start, end, template_ids } = req.query;
 
     // Ensure the necessary query parameters are provided
@@ -87,7 +88,6 @@ const getAnalytics = async (req, res) => {
       }
     });
 
-    const data = response.data[0];
     let allSent = 0, allRead = 0, allClicked = 0, allDelivered = 0;
 
     data.data_points.forEach(point => {
@@ -309,7 +309,9 @@ const updateContact = async (req, res) => {
     const updatedData = req.body;
     console.log(updatedData,_id)
 
+
     const updatedContact = await Contact.findOneAndUpdate({ _id:_id }, updatedData, { new: true });
+
     if (!updatedContact) {
       return res.status(404).json({ error: 'Contact not found' });
     }
