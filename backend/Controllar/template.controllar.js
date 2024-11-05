@@ -363,7 +363,8 @@ const updateContact = async (req, res) => {
     console.log(updatedData,_id)
 
 
-    const updatedContact = await Contact.findOneAndUpdate({ _id:_id }, updatedData, { new: true });
+    const updatedContact = await Contact.findOneAndUpdate({ _id:_id }, { $set: updatedData }, 
+      { new: true, runValidators: true });
 
     if (!updatedContact) {
       return res.status(404).json({ error: 'Contact not found' });
