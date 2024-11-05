@@ -17,6 +17,7 @@ templateRouter.get('/unique-attributes',templateController.getAllUniqueAttribute
 templateRouter.post('/createtemplete', templateController.createTemplate);
 templateRouter.post('/schedule', templateController.scheduleTemplate);
 templateRouter.post('/contacts', templateController.createContact);
+templateRouter.post('/bulkContacts', templateController.createContactsBulk);
 templateRouter.post('/message_send', templateController.sendMessage );
 // put api start 
 
