@@ -209,24 +209,61 @@ const createContactsBulk = async (req, res) => {
 
 const scheduleTemplate = async (req, res) => {
   try {
-    const { userId, broadcastName, templateId, contact, scheduleTime,contactAttributes } = req.body;
+    const { contactarr, template } = req.body;
 
-    const newSchedule = new TemplateSchedule({
-      userId,
-      broadcastName,
-      templateId: templateId, 
-      contact:contact, 
-      contactAttributes:contactAttributes,                   
-      scheduleTime: scheduleTime
+    // Check if contactarr is an array and not empty
+    if (!Array.isArray(contactarr) || contactarr.length === 0) {
+      return res.status(400).json({ error: "An array of phone numbers is required" });
+    }
+
+    // Use find with the $in operator to find all matching contacts
+    const contacts = await Contact.find({ phone: { $in: contactarr } });
+
+    if (contacts.length === 0) {
+      console.log('Contacts not found');
+      return res.status(404).json({ message: 'Contacts not found' });
+    }
+
+    // Loop through each contact to update the template
+    const updatedTemplates = contacts.map(contact => {
+      // Create a map of contact attributes (key-value pairs)
+      const attributeMap = {};
+      contact.contactAttributes.forEach(attr => {
+        attributeMap[attr.key] = attr.value;  // store attribute key and value pair
+      });
+
+      // Make a deep copy of the template to avoid mutating the original
+      const updatedTemplate = JSON.parse(JSON.stringify(template));
+
+      // Loop through the components and replace the placeholders with the correct values
+      updatedTemplate.components.forEach(component => {
+        if (component.text) {
+          // Replace placeholders in the text (e.g., {{1}}, {{2}}) with the corresponding contact attributes
+          component.text = component.text.replace(/{{(\d+)}}/g, (match, index) => {
+            // Find the key in the attribute map based on index
+            const attributeKey = component.example && component.example.body_text ? component.example.body_text[0][index - 1] : null;
+            
+            // If the attribute exists in the map, replace the placeholder, otherwise keep it as it is
+            return attributeKey && attributeMap[attributeKey] ? attributeMap[attributeKey] : match;
+          });
+        }
+      });
+
+      return updatedTemplate; // Return the updated template for each contact
     });
 
-    await newSchedule.save();
-
-    res.status(201).json({"message":"contact scheduleTemplate succesfully"});
+    // You can save these updated templates to a database, send them, or process them further here.
+    // For this example, let's just return them in the response.
+    res.status(201).json({
+      message: "Contacts successfully retrieved and templates updated",
+      data: updatedTemplates
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
+
+
 
 const createTemplate = async (req, res) => {
   const payload = req.body;
@@ -358,23 +395,36 @@ const sendMessage = async (req, res) => {
 
 const updateContact = async (req, res) => {
   try {
-    const { _id } = req.params;
-    const updatedData = req.body;
-    console.log(updatedData,_id)
+    const { _id } = req.params;  // Contact ID from the request parameters
+    const updatedData = req.body; // Data to update in the contact document
 
+    // Optional: Validate that updatedData contains valid fields if needed
+    // e.g., if specific fields must exist in updatedData, add checks here
+    
+    console.log('Updating contact with ID:', _id);
+    console.log('Updated Data:', updatedData);
 
-    const updatedContact = await Contact.findOneAndUpdate({ _id:_id }, { $set: updatedData }, 
-      { new: true, runValidators: true });
+    // Perform the update operation
+    const updatedContact = await Contact.findOneAndUpdate(
+      { _id }, 
+      { $set: updatedData }, 
+      { new: true, runValidators: true }
+    );
 
+    // If no contact is found with the given _id, return an error
     if (!updatedContact) {
       return res.status(404).json({ error: 'Contact not found' });
     }
 
+    // Return the updated contact
     res.status(200).json(updatedContact);
   } catch (error) {
+    // Handle errors and return a meaningful response
+    console.error('Error updating contact:', error);
     res.status(500).json({ error: error.message });
   }
 };
+
 
 const deleteContactAttribute = async (req, res) => {
   try {
@@ -574,6 +624,9 @@ const deleteBroadcast = async (req, res) => {
     return res.status(500).json({ message: 'Error deleting broadcast', error: error.message });
   }
 };
+
+
+
 module.exports = {
   createTemplate,
   scheduleTemplate,
