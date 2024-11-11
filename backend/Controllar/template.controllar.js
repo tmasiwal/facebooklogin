@@ -396,7 +396,7 @@ const sendMessage = async (req, res) => {
 const updateContact = async (req, res) => {
   try {
     const { _id } = req.params;  // Contact ID from the request parameters
-    const updatedData = req.body; // Data to update in the contact document
+    const updatedData = req.body.updatedData; // Data to update in the contact document
 
     // Optional: Validate that updatedData contains valid fields if needed
     // e.g., if specific fields must exist in updatedData, add checks here
