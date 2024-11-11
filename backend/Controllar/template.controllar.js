@@ -124,17 +124,6 @@ const createContact = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Validate and save unique contact attributes
-    const existingKeys = await KeyAttribute.find({ key: { $in: contactAttributes.map(attr => attr.key) } }).select('key');
-    const existingKeysSet = new Set(existingKeys.map(attr => attr.key));
-
-    const newAttributes = contactAttributes.filter(attr => !existingKeysSet.has(attr.key));
-    
-    // Save new key attributes
-    if (newAttributes.length > 0) {
-      await KeyAttribute.insertMany(newAttributes);
-    }
-
     const contact = new Contact({
       userId,
       name,
@@ -160,24 +149,13 @@ const createContactsBulk = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Create a Set to track unique keys for attributes
-    const allContactAttributes = contacts.flatMap(contact => contact.contactAttributes);
-    const existingKeys = await KeyAttribute.find({ key: { $in: allContactAttributes.map(attr => attr.key) } }).select('key');
-    const existingKeysSet = new Set(existingKeys.map(attr => attr.key));
-
-    // Prepare to save new attributes and contacts
-    const newAttributes = [];
+  
     const newContacts = [];
 
     for (const contact of contacts) {
       // Validate contact data
       const { name, phone, broadcast, sms, contactAttributes } = contact;
 
-      // Check for unique attributes and collect new ones
-      const uniqueAttributes = contactAttributes.filter(attr => !existingKeysSet.has(attr.key));
-
-      // Add unique attributes to the array
-      newAttributes.push(...uniqueAttributes);
 
       // Prepare the contact for saving
       newContacts.push({
@@ -188,11 +166,6 @@ const createContactsBulk = async (req, res) => {
         sms,
         contactAttributes
       });
-    }
-
-    // Save new key attributes if any
-    if (newAttributes.length > 0) {
-      await KeyAttribute.insertMany(newAttributes);
     }
 
     // Save all new contacts at once

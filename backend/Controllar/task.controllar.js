@@ -43,14 +43,12 @@ const CanceleTask = async (req, res) =>{
 
 
 const axios = require('axios');
-const mongoose = require('mongoose');
-const KeyAttribute = require('../Model/keyAttribute.model'); // Ensure this path is correct
-const Contact = require('../Model/contact.model'); // Adjust the path as necessary
+const Contact = require('../Model/contact.model'); // Adjust this path
 
-async function sendDynamicWhatsAppMessage(recipientPhone, templateId, contactAttributes) {
+// Function to fetch the template only once
+async function fetchTemplate(templateId) {
   try {
-    // Fetch template data
-    const templateResponse = await axios.get(
+    const response = await axios.get(
       `https://interakt-amped-express.azurewebsites.net/api/v17.0/308727328997268/message_templates/id/${templateId}`,
       {
         headers: {
@@ -60,20 +58,17 @@ async function sendDynamicWhatsAppMessage(recipientPhone, templateId, contactAtt
         },
       }
     );
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching template:', error.response?.data || error.message);
+    throw error;
+  }
+}
 
-    const templateData = templateResponse.data;
+// Function to send WhatsApp message using the template
+async function sendDynamicWhatsAppMessage(recipientPhone, templateData, attributes, contactAttributes) {
+  try {
     const { name, language, components } = templateData;
-
-    // Fetch keys from the database
-    const existingKeys = await KeyAttribute.find({
-      key: { $in: contactAttributes?.map(attr => attr.key) }
-    }).select('key value');
-
-    // Convert the fetched keys to a map for easier lookup
-    const keyMap = existingKeys.reduce((map, obj) => {
-      map[obj.key] = obj.value;
-      return map;
-    }, {});
 
     // Prepare the base payload
     const payload = {
@@ -88,19 +83,22 @@ async function sendDynamicWhatsAppMessage(recipientPhone, templateId, contactAtt
       },
     };
 
+    // Function to get attribute value (from contact first, then default attributes)
+    const getAttributeValue = (key, fallbackArray) => contactAttributes[key] || fallbackArray.shift();
+
     // Loop through components to dynamically add them to the payload
     components.forEach((component) => {
-      if (component.type === 'HEADER') {
-        // Handle different header formats like IMAGE, VIDEO, DOCUMENT
+      if (component.type === 'HEADER' && attributes.header) {
+        const headerValue = getAttributeValue('header', [...attributes.header]);
+
+        // Handle header formats like IMAGE, VIDEO, DOCUMENT
         if (component.format === 'IMAGE') {
           payload.template.components.push({
             type: 'header',
             parameters: [
               {
                 type: 'image',
-                image: {
-                  link: component.example.header_handle[0],
-                },
+                image: { link: headerValue },
               },
             ],
           });
@@ -110,9 +108,7 @@ async function sendDynamicWhatsAppMessage(recipientPhone, templateId, contactAtt
             parameters: [
               {
                 type: 'video',
-                video: {
-                  link: component.example.header_handle[0],
-                },
+                video: { link: headerValue },
               },
             ],
           });
@@ -122,37 +118,30 @@ async function sendDynamicWhatsAppMessage(recipientPhone, templateId, contactAtt
             parameters: [
               {
                 type: 'document',
-                document: {
-                  link: component.example.header_handle[0],
-                },
+                document: { link: headerValue },
               },
             ],
           });
         }
-      } else if (component.type === 'BODY') {
-        // Handle body with text placeholders
-        const bodyText = component.text;
-        const bodyExample = component.example?.body_text?.[0];
+      } else if (component.type === 'BODY' && attributes.body) {
+        // Replace placeholders in the body text (e.g., {{1}}, {{2}})
+        let bodyText = component.text;
+        const bodyValues = attributes.body.map((key) => getAttributeValue(key, [...attributes.body]));
 
-        // Prepare body parameters array
-        const bodyParams = [];
-        if (bodyExample && Array.isArray(bodyExample) && bodyExample.length > 0) {
-          bodyExample.forEach((key, index) => {
-            // Check if the key exists in the keyMap, otherwise use the default text
-            const replacementText = keyMap[key] || key;
-            bodyParams.push({ type: 'text', text: replacementText });
-          });
+        bodyValues.forEach((value, index) => {
+          const placeholder = `{{${index + 1}}}`;
+          bodyText = bodyText.replace(placeholder, value);
+        });
 
-          // Add the body component to the payload
-          payload.template.components.push({
-            type: 'body',
-            parameters: bodyParams,
-          });
-        }
+        payload.template.components.push({
+          type: 'body',
+          parameters: [{ type: 'text', text: bodyText }],
+        });
       }
     });
 
     // Send the request to the Interakt API
+    console.log("Final Payload:", JSON.stringify(payload, null, 2));
     const response = await axios.post(
       'https://amped-express.interakt.ai/api/v17.0/425551820647436/messages',
       payload,
@@ -165,28 +154,39 @@ async function sendDynamicWhatsAppMessage(recipientPhone, templateId, contactAtt
       }
     );
 
-    console.log('Message sent successfully:', response.data);
+    console.log(`Message sent successfully to ${recipientPhone}`);
   } catch (error) {
-    console.error('Error sending message:', error.response?.data || error.message);
+    console.error(`Error sending message to ${recipientPhone}:`, error.response?.data || error.message);
   }
 }
 
-async function sendMessagesToAllContacts(userId, templateId) {
+// Function to send messages to all contacts based on provided IDs
+async function sendMessagesToSelectedContacts(templateId, contactIds, attributes) {
   try {
-    // Fetch all contacts for the given userId
-    const contacts = await Contact.find({ userId });
+    // Fetch the template once
+    const templateData = await fetchTemplate(templateId);
+    console.log('Template fetched successfully:', templateData.name);
+
+    // Fetch all contacts for the given IDs
+    const contacts = await Contact.find({ _id: { $in: contactIds } });
 
     if (contacts.length === 0) {
-      console.log('No contacts found for the given userId.');
+      console.log('No contacts found for the provided IDs.');
       return;
     }
 
-    // Loop through each contact and send a message
     for (const contact of contacts) {
       const phone = contact.phone;
       const contactAttributes = contact.contactAttributes || [];
+
+      // Map the contact attributes for quick lookup
+      const attributeMap = contactAttributes.reduce((acc, attr) => {
+        acc[attr.key] = attr.value;
+        return acc;
+      }, {});
+
       console.log(`Sending message to: ${phone}`);
-      await sendDynamicWhatsAppMessage(phone, templateId, contactAttributes);
+      await sendDynamicWhatsAppMessage(phone, templateData, attributes, attributeMap);
     }
 
     console.log('All messages sent successfully.');
@@ -195,10 +195,18 @@ async function sendMessagesToAllContacts(userId, templateId) {
   }
 }
 
-// Example usage
-const userId = '66d9561438c83c4774d9d9e5'; 
-const templateId = '1052164973255418';
-sendMessagesToAllContacts(userId, templateId);
+
+// // Example usage
+// const templateId = '1308823763449725';
+// const contactIds = ['66dfcbc855f7ef388357b287', '66dc0462fb45e45d4986bd1b']; // Replace with actual contact IDs
+// const attributes = {
+//   header: ['https://brodcastwatsapp.blob.core.windows.net/tempateimage/newvdeo.mp4'], // Header key or default value
+
+//   // Body keys or default values
+//   body: ['Pankaj'],
+// };
+
+// sendMessagesToSelectedContacts(templateId, contactIds, attributes);
 
 
-module.exports ={ScheduleTask,CanceleTask}
+module.exports ={ScheduleTask,CanceleTask,sendMessagesToSelectedContacts}
