@@ -479,16 +479,15 @@ const getAllContactAttributesByUserId = async (req, res) => {
 
 const getAllUniqueAttributes = async (req, res) => {
   try {
-    // Retrieve all key attributes from the KeyAttribute model
-    const uniqueAttributes = await KeyAttribute.find({}).select('key value');
+    const { userId } = req.params; // assuming userId is provided as a route parameter
+    const uniqueAttributes = await Contact.aggregate([
+      { $match: { userId } }, // Match documents with the given userId
+      { $unwind: "$contactAttributes" }, // Unwind the contactAttributes array
+      { $group: { _id: null, uniqueKeys: { $addToSet: "$contactAttributes.key" } } }, // Group to get unique keys
+      { $project: { _id: 0, uniqueKeys: 1 } } // Project only the uniqueKeys array
+    ]);
 
-    // Check if no attributes are found
-    if (uniqueAttributes.length === 0) {
-      return res.status(404).json({ message: 'No unique attributes found' });
-    }
-
-    // Return the list of unique attributes
-    res.status(200).json({ uniqueAttributes });
+    res.status(200).json(uniqueAttributes.length ? uniqueAttributes[0].uniqueKeys : []);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
