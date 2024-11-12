@@ -555,6 +555,18 @@ const deleteBroadcast = async (req, res) => {
     return res.status(500).json({ message: 'Error deleting broadcast', error: error.message });
   }
 };
+const getBroadcast = async (req, res) => {
+  const { userId } = req.params;
+  try {
+    const broadcast = await TemplateSchedule.find({userId} );
+    if (!broadcast) {
+      return res.status(404).json({ message: 'Broadcast not found' });
+    }
+    res.status(200).json(broadcast);
+    } catch (error) {
+    res.status(500).json({ message: 'Error fetching broadcast', error: error.message });
+    }
+}
 
 
 
@@ -577,6 +589,7 @@ module.exports = {
   getAllUniqueAttributes,
   updateBroadcast,
   deleteBroadcast,
-  createContactsBulk
+  createContactsBulk,
+  getBroadcast
 };
 

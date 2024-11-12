@@ -106,6 +106,7 @@ templateRouter.get('/contacts/:phone', templateController.getContactByPhone);
 templateRouter.get('/contacts/user/:userId', templateController.getContactsByUser);
 templateRouter.get('/all-attributes', templateController.getAllContactAttributesByUserId);
 templateRouter.get('/unique-attributes',templateController.getAllUniqueAttributes);
+templateRouter.get('/getBroadcast',templateController.getBroadcast);
 // post api start 
 templateRouter.post('/createtemplete', templateController.createTemplate);
 templateRouter.post('/schedule', templateController.scheduleTemplate);
