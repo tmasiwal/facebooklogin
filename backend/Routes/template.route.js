@@ -121,7 +121,7 @@ templateRouter.put('/update_schedule/:broadcastId',templateController.updateBroa
 // delete api start 
 
 templateRouter.delete('/contacts/:userId/:phone/attributes/:key', templateController.deleteContactAttribute);
-templateRouter.delete('/contacts/:phone', templateController.deleteContact);
+templateRouter.delete('/contacts/:Id', templateController.deleteContact);
 templateRouter.delete('/contacts', templateController.deleteAllContacts);
 templateRouter.delete('/delete_broadcast/:broadcastId', templateController.deleteBroadcast)
 module.exports = templateRouter;

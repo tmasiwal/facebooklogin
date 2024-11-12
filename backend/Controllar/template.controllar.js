@@ -388,9 +388,9 @@ const deleteContactAttribute = async (req, res) => {
 
 const deleteContact = async (req, res) => {
   try {
-    const { phone } = req.params;
+    const { Id } = req.params;
 
-    const deletedContact = await Contact.findOneAndDelete({ phone });
+    const deletedContact = await Contact.findOneAndDelete({ _id:Id});
     if (!deletedContact) {
       return res.status(404).json({ error: 'Contact not found' });
     }
