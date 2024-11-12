@@ -557,7 +557,8 @@ const deleteBroadcast = async (req, res) => {
 const getBroadcast = async (req, res) => {
   const { userId } = req.params;
   try {
-    const broadcast = await TemplateSchedule.find({userId} );
+    const broadcast = await TemplateSchedule.find({userId,
+      status:"scheduled"} );
     if (!broadcast) {
       return res.status(404).json({ message: 'Broadcast not found' });
     }
