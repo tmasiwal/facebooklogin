@@ -2,11 +2,11 @@ const {Task} =require("../Model/task.model")
 
 
 const ScheduleTask = async (req, res) =>{
-const { username, action, time } = req.body;
+const { userId, action, time } = req.body;
 
 try {
   const newTask = new Task({
-    username,
+    userId,
     action,
     scheduledTime: new Date(time),
     status: "pending",
@@ -20,11 +20,11 @@ try {
 
 
 const CanceleTask = async (req, res) =>{
-    const { username, action } = req.body;
+    const { userId, action } = req.body;
 
     try {
       const task = await Task.findOne({
-        username,
+        userId,
         action,
         status: "pending",
       });

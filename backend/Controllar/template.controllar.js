@@ -182,54 +182,12 @@ const createContactsBulk = async (req, res) => {
 
 const scheduleTemplate = async (req, res) => {
   try {
-    const { contactarr, template } = req.body;
-
-    // Check if contactarr is an array and not empty
-    if (!Array.isArray(contactarr) || contactarr.length === 0) {
-      return res.status(400).json({ error: "An array of phone numbers is required" });
-    }
-
-    // Use find with the $in operator to find all matching contacts
-    const contacts = await Contact.find({ phone: { $in: contactarr } });
-
-    if (contacts.length === 0) {
-      console.log('Contacts not found');
-      return res.status(404).json({ message: 'Contacts not found' });
-    }
-
-    // Loop through each contact to update the template
-    const updatedTemplates = contacts.map(contact => {
-      // Create a map of contact attributes (key-value pairs)
-      const attributeMap = {};
-      contact.contactAttributes.forEach(attr => {
-        attributeMap[attr.key] = attr.value;  // store attribute key and value pair
-      });
-
-      // Make a deep copy of the template to avoid mutating the original
-      const updatedTemplate = JSON.parse(JSON.stringify(template));
-
-      // Loop through the components and replace the placeholders with the correct values
-      updatedTemplate.components.forEach(component => {
-        if (component.text) {
-          // Replace placeholders in the text (e.g., {{1}}, {{2}}) with the corresponding contact attributes
-          component.text = component.text.replace(/{{(\d+)}}/g, (match, index) => {
-            // Find the key in the attribute map based on index
-            const attributeKey = component.example && component.example.body_text ? component.example.body_text[0][index - 1] : null;
-            
-            // If the attribute exists in the map, replace the placeholder, otherwise keep it as it is
-            return attributeKey && attributeMap[attributeKey] ? attributeMap[attributeKey] : match;
-          });
-        }
-      });
-
-      return updatedTemplate; // Return the updated template for each contact
-    });
-
-    // You can save these updated templates to a database, send them, or process them further here.
-    // For this example, let's just return them in the response.
-    res.status(201).json({
-      message: "Contacts successfully retrieved and templates updated",
-      data: updatedTemplates
+    const { userId,broadcastName,templateId ,contactId,scheduleTime}=req.body
+   const newTask= TemplateSchedule.new(userId,broadcastName,templateId,contactId,scheduleTime)
+    const savedTask= await newTask.save()
+    res.status(200).json({
+      message: "Task saved successfully",
+    
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
