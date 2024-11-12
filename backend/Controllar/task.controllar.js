@@ -41,8 +41,9 @@ const CanceleTask = async (req, res) =>{
     }
 }
 
-
 const axios = require('axios');
+const mongoose = require('mongoose');
+const KeyAttribute = require('../Model/keyAttribute.model'); // Adjust this path
 const Contact = require('../Model/contact.model'); // Adjust this path
 
 // Function to fetch the template only once
@@ -66,7 +67,7 @@ async function fetchTemplate(templateId) {
 }
 
 // Function to send WhatsApp message using the template
-async function sendDynamicWhatsAppMessage(recipientPhone, templateData, attributes, contactAttributes) {
+async function sendDynamicWhatsAppMessage(recipientPhone, templateData, attributes) {
   try {
     const { name, language, components } = templateData;
 
@@ -83,14 +84,9 @@ async function sendDynamicWhatsAppMessage(recipientPhone, templateData, attribut
       },
     };
 
-    // Function to get attribute value (from contact first, then default attributes)
-    const getAttributeValue = (key, fallbackArray) => contactAttributes[key] || fallbackArray.shift();
-
     // Loop through components to dynamically add them to the payload
     components.forEach((component) => {
       if (component.type === 'HEADER' && attributes.header) {
-        const headerValue = getAttributeValue('header', [...attributes.header]);
-
         // Handle header formats like IMAGE, VIDEO, DOCUMENT
         if (component.format === 'IMAGE') {
           payload.template.components.push({
@@ -98,7 +94,7 @@ async function sendDynamicWhatsAppMessage(recipientPhone, templateData, attribut
             parameters: [
               {
                 type: 'image',
-                image: { link: headerValue },
+                image: { link: attributes.header[0] },
               },
             ],
           });
@@ -108,7 +104,7 @@ async function sendDynamicWhatsAppMessage(recipientPhone, templateData, attribut
             parameters: [
               {
                 type: 'video',
-                video: { link: headerValue },
+                video: { link: attributes.header[0] },
               },
             ],
           });
@@ -118,30 +114,22 @@ async function sendDynamicWhatsAppMessage(recipientPhone, templateData, attribut
             parameters: [
               {
                 type: 'document',
-                document: { link: headerValue },
+                document: { link: attributes.header[0] },
               },
             ],
           });
         }
       } else if (component.type === 'BODY' && attributes.body) {
-        // Replace placeholders in the body text (e.g., {{1}}, {{2}})
-        let bodyText = component.text;
-        const bodyValues = attributes.body.map((key) => getAttributeValue(key, [...attributes.body]));
-
-        bodyValues.forEach((value, index) => {
-          const placeholder = `{{${index + 1}}}`;
-          bodyText = bodyText.replace(placeholder, value);
-        });
-
+        // Handle body with text placeholders
+        const bodyParams = attributes.body.map(text => ({ type: 'text', text }));
         payload.template.components.push({
           type: 'body',
-          parameters: [{ type: 'text', text: bodyText }],
+          parameters: bodyParams,
         });
       }
     });
-
-    // Send the request to the Interakt API
     console.log("Final Payload:", JSON.stringify(payload, null, 2));
+    // Send the request to the Interakt API
     const response = await axios.post(
       'https://amped-express.interakt.ai/api/v17.0/425551820647436/messages',
       payload,
@@ -185,8 +173,14 @@ async function sendMessagesToSelectedContacts(templateId, contactIds, attributes
         return acc;
       }, {});
 
+      // Prepare final attributes
+      const finalAttributes = {
+        header: attributes.header.map(key => attributeMap[key] || key),
+        body: attributes.body.map(key => attributeMap[key] || key),
+      };
+
       console.log(`Sending message to: ${phone}`);
-      await sendDynamicWhatsAppMessage(phone, templateData, attributes, attributeMap);
+      await sendDynamicWhatsAppMessage(phone, templateData, finalAttributes);
     }
 
     console.log('All messages sent successfully.');
@@ -196,7 +190,7 @@ async function sendMessagesToSelectedContacts(templateId, contactIds, attributes
 }
 
 
-// // Example usage
+// Example usage
 // const templateId = '1308823763449725';
 // const contactIds = ['66dfcbc855f7ef388357b287', '66dc0462fb45e45d4986bd1b']; // Replace with actual contact IDs
 // const attributes = {

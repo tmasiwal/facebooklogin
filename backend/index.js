@@ -41,7 +41,9 @@ const Data = mongoose.model("onboarding", dataSchema);
 const userRouter = require("./Routes/user.router");
 const taskRouter = require("./Routes/task.router");
 const templateRouter = require("./Routes/template.route");
-const { sendMessagesToSelectedContacts } = require("./Controllar/task.controllar");
+const {
+  sendMessagesToSelectedContacts,
+} = require("./Controllar/task.controllar");
 app.use("/user", userRouter);
 app.use("/task", taskRouter);
 app.use("/template", templateRouter);
@@ -183,22 +185,23 @@ cron.schedule("* * * * *", async () => {
 
     // Loop through each broadcast
     for (const broadcast of broadcasts) {
-      /// Example usage
-      // const templateId = "1308823763449725";
-      // const contactIds = [
-      //   "66dfcbc855f7ef388357b287",
-      //   "66dc0462fb45e45d4986bd1b",
-      // ]; // Replace with actual contact IDs
-      // const attributes = {
-      //   header: [
-      //     "https://brodcastwatsapp.blob.core.windows.net/tempateimage/newvdeo.mp4",
-      //   ], // Header key or default value
+      // Example usage
+      const templateId = '1308823763449725';
+      const contactIds = ['66dfcbc855f7ef388357b287', '66dc0462fb45e45d4986bd1b']; // Replace with actual contact IDs
+      const attributes = {
+        header: ['https://brodcastwatsapp.blob.core.windows.net/tempateimage/newvdeo.mp4'], // Header key or default value
 
-      //   // Body keys or default values
-      //   body: ["Pankaj"],
-      // };
-       
-       let result = await sendMessagesToSelectedContacts(broadcast.templateId, broadcast.contactIds, broadcast.attributes)
+        // Body keys or default values
+        body: ['Pankaj'],
+      };
+
+      let result = sendMessagesToSelectedContacts(templateId, contactIds, attributes);
+
+      // let result = await sendMessagesToSelectedContacts(
+      //   broadcast.templateId,
+      //   broadcast.contactIds,
+      //   broadcast.attributes
+      // );
       if (result) {
         broadcast.status = "completed";
         await broadcast.save();
