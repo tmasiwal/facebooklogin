@@ -8,6 +8,7 @@ const axios = require('axios');
 const TemplateSchedule = require('../Model/TemplateSchedule.model');
 const Contact = require('../Model/contact.model');
 const {User}= require("../Model/user.model")
+const mongoose = require('mongoose');
 const getTemplateAnalytics = async (req, res) => {
   try {
     // Extract start, end, and template_ids from query parameters
@@ -480,8 +481,9 @@ const getAllContactAttributesByUserId = async (req, res) => {
 const getAllUniqueAttributes = async (req, res) => {
   try {
     const { userId } = req.params; // assuming userId is provided as a route parameter
+    console.log(userId)
     const uniqueAttributes = await Contact.aggregate([
-      { $match: { userId } }, // Match documents with the given userId
+      { $match: { userId: new mongoose.Types.ObjectId(userId) } }, // Match documents with the given userId
       { $unwind: "$contactAttributes" }, // Unwind the contactAttributes array
       { $group: { _id: null, uniqueKeys: { $addToSet: "$contactAttributes.key" } } }, // Group to get unique keys
       { $project: { _id: 0, uniqueKeys: 1 } } // Project only the uniqueKeys array
