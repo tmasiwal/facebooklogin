@@ -184,7 +184,14 @@ const createContactsBulk = async (req, res) => {
 const scheduleTemplate = async (req, res) => {
   try {
     const { userId,broadcastName,templateId ,contactId,scheduleTime}=req.body
-   const newTask= TemplateSchedule.new(userId,broadcastName,templateId,contactId,scheduleTime)
+   const newTask=  new TemplateSchedule({
+    userId,
+    broadcastName,
+    templateId,
+    contactId,
+    scheduleTime
+  });
+
     const savedTask= await newTask.save()
     res.status(200).json({
       message: "Task saved successfully",
