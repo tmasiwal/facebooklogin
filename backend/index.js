@@ -198,7 +198,7 @@ cron.schedule("* * * * *", async () => {
       //   body: ["Pankaj"],
       // };
        
-       let result = await sendMessagesToSelectedContacts(broadcast.templateId, broadcast.contactIds, broadcast.attributes)
+       let result = await sendMessagesToSelectedContacts(broadcast.templateId, broadcast.contactId, broadcast.attributes)
       if (result) {
         broadcast.status = "completed";
         await broadcast.save();
