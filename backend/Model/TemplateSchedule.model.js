@@ -6,8 +6,7 @@ const TemplateScheduleSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
   broadcastName: { type: String, required: true },
   templateId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Template",
+    type:String,
     required: true,
   },
   contactId: [{ type: String, required: true }],
