@@ -97,8 +97,8 @@ async function sendDynamicWhatsAppMessage(
       if (component.type === "HEADER" && attributes.header) {
         const headerValue = getAttributeValue("header", [...attributes.header]);
 
-        // Handle header formats like IMAGE, VIDEO, DOCUMENT
-        if (component.format === "IMAGE") {
+        // Determine the format of the header (IMAGE, VIDEO, DOCUMENT, or TEXT)
+        if (component.format === "IMAGE" && headerValue.startsWith("http")) {
           payload.template.components.push({
             type: "header",
             parameters: [
@@ -108,7 +108,7 @@ async function sendDynamicWhatsAppMessage(
               },
             ],
           });
-        } else if (component.format === "VIDEO") {
+        } else if (component.format === "VIDEO" && headerValue.startsWith("http")) {
           payload.template.components.push({
             type: "header",
             parameters: [
@@ -118,7 +118,7 @@ async function sendDynamicWhatsAppMessage(
               },
             ],
           });
-        } else if (component.format === "DOCUMENT") {
+        } else if (component.format === "DOCUMENT" && headerValue.startsWith("http")) {
           payload.template.components.push({
             type: "header",
             parameters: [
@@ -128,26 +128,29 @@ async function sendDynamicWhatsAppMessage(
               },
             ],
           });
+        } else {
+          // Default to text if it's not a link or other known format
+          payload.template.components.push({
+            type: "header",
+            parameters: [{ type: "text", text: headerValue }],
+          });
         }
       } else if (component.type === "BODY" && attributes.body) {
-        // Replace placeholders in the body text (e.g., {{1}}, {{2}})
-        let bodyText = component.text;
-        const bodyValues = attributes.body.map((key) =>
-          getAttributeValue(key, [...attributes.body])
-        );
+        const bodyParameters = attributes.body.map((key) => ({
+          type: "text",
+          text: getAttributeValue(key, [...attributes.body]),
+        }));
 
-        bodyValues.forEach((value, index) => {
-          const placeholder = `{{${index + 1}}}`;
-          bodyText = bodyText.replace(placeholder, value);
-        });
-
+        // Add the body component to the payload
         payload.template.components.push({
           type: "body",
-          parameters: [{ type: "text", text: bodyText }],
+          parameters: bodyParameters,
         });
       }
     });
+
     console.log("Final Payload:", JSON.stringify(payload, null, 2));
+
     // Send the request to the Interakt API
     const response = await axios.post(
       "https://amped-express.interakt.ai/api/v17.0/425551820647436/messages",
@@ -181,16 +184,8 @@ async function sendMessagesToSelectedContacts(
     const templateData = await fetchTemplate(templateId);
     console.log("Template fetched successfully:", templateData.name);
 
-    // Fetch all contacts for the given IDs
-    // const contacts = await Contact.find({ _id: { $in: contactIds } });
-
-    // if (contacts.length === 0) {
-    //   console.log('No contacts found for the provided IDs.');
-    //   return;
-    // }
-
-    for (const contactid of contactIds) {
-      const contact = await Contact.findById(contactid);
+    for (const contactId of contactIds) {
+      const contact = await Contact.findById(contactId);
       const phone = contact.phone;
       const contactAttributes = contact.contactAttributes || [];
 
@@ -202,15 +197,15 @@ async function sendMessagesToSelectedContacts(
 
       // Prepare final attributes
       const finalAttributes = {
-        header: attributes.header.map(key => attributeMap[key] || key),
-        body: attributes.body.map(key => attributeMap[key] || key),
+        header: attributes.header,
+        body: attributes.body.map((key) => attributeMap[key] || key),
       };
 
       console.log(`Sending message to: ${phone}`);
       await sendDynamicWhatsAppMessage(
         phone,
         templateData,
-        attributes,
+        finalAttributes,
         attributeMap
       );
     }
@@ -221,16 +216,17 @@ async function sendMessagesToSelectedContacts(
   }
 }
 
-// // Example usage
-// const templateId = '1308823763449725';
-// const contactIds = ['66dfcbc855f7ef388357b287', '66dc0462fb45e45d4986bd1b']; // Replace with actual contact IDs
+// Example usage
+// const templateId = "1308823763449725";
+// const contactIds = ["66dc0399fb45e45d4986bd13", "66dc0462fb45e45d4986bd1b"];
 // const attributes = {
-//   header: ['https://brodcastwatsapp.blob.core.windows.net/tempateimage/newvdeo.mp4'], // Header key or default value
-
-//   // Body keys or default values
-//   body: ['Pankaj'],
+//   header: ["https://brodcastwatsapp.blob.core.windows.net/tempateimage/newvdeo.mp4"], // Can be a link for image/video/document or plain text
+//   body: ["Pankaj"], // Body text
 // };
 
 // sendMessagesToSelectedContacts(templateId, contactIds, attributes);
+
+
+
 
 module.exports = { ScheduleTask, CanceleTask, sendMessagesToSelectedContacts };

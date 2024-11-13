@@ -186,22 +186,22 @@ cron.schedule("* * * * *", async () => {
     // Loop through each broadcast
     for (const broadcast of broadcasts) {
       // Example usage
-      const templateId = '1308823763449725';
-      const contactIds = ['66dfcbc855f7ef388357b287', '66dc0462fb45e45d4986bd1b']; // Replace with actual contact IDs
-      const attributes = {
-        header: ['https://brodcastwatsapp.blob.core.windows.net/tempateimage/newvdeo.mp4'], // Header key or default value
+      // const templateId = '1308823763449725';
+      // const contactIds = ['66dfcbc855f7ef388357b287', '66dc0462fb45e45d4986bd1b']; // Replace with actual contact IDs
+      // const attributes = {
+      //   header: ['https://brodcastwatsapp.blob.core.windows.net/tempateimage/newvdeo.mp4'], // Header key or default value
 
-        // Body keys or default values
-        body: ['Pankaj'],
-      };
+      //   // Body keys or default values
+      //   body: ['Pankaj'],
+      // };
 
-      let result = sendMessagesToSelectedContacts(templateId, contactIds, attributes);
+      // let result = sendMessagesToSelectedContacts(templateId, contactIds, attributes);
 
-      // let result = await sendMessagesToSelectedContacts(
-      //   broadcast.templateId,
-      //   broadcast.contactId,
-      //   broadcast.attributes
-      // );
+      let result = await sendMessagesToSelectedContacts(
+        broadcast.templateId,
+        broadcast.contactId,
+        broadcast.attributes
+      );
       if (result) {
         broadcast.status = "completed";
         await broadcast.save();
