@@ -183,13 +183,14 @@ const createContactsBulk = async (req, res) => {
 
 const scheduleTemplate = async (req, res) => {
   try {
-    const { userId,broadcastName,templateId ,contactId,scheduleTime}=req.body
+    const { userId,broadcastName,templateId ,contactId,scheduleTime,attributes}=req.body
    const newTask=  new TemplateSchedule({
     userId,
     broadcastName,
     templateId,
     contactId,
-    scheduleTime
+    scheduleTime,
+    attributes
   });
 
     const savedTask= await newTask.save()
