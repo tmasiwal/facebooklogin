@@ -23,7 +23,7 @@ const TemplateScheduleSchema = new mongoose.Schema({
     enum: ["scheduled", "completed", "failed"],
     default: "scheduled",
   },
-  createdAt: { type: Date, default: Date.now },
+  createdAt: { type: Date, default: Date.now() },
 });
 
 // Create the model
