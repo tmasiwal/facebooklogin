@@ -8,6 +8,7 @@ const axios = require('axios');
 const TemplateSchedule = require('../Model/TemplateSchedule.model');
 const Contact = require('../Model/contact.model');
 const {User}= require("../Model/user.model")
+const mongoose = require('mongoose');
 const getTemplateAnalytics = async (req, res) => {
   try {
     // Extract start, end, and template_ids from query parameters
@@ -182,54 +183,12 @@ const createContactsBulk = async (req, res) => {
 
 const scheduleTemplate = async (req, res) => {
   try {
-    const { contactarr, template } = req.body;
-
-    // Check if contactarr is an array and not empty
-    if (!Array.isArray(contactarr) || contactarr.length === 0) {
-      return res.status(400).json({ error: "An array of phone numbers is required" });
-    }
-
-    // Use find with the $in operator to find all matching contacts
-    const contacts = await Contact.find({ phone: { $in: contactarr } });
-
-    if (contacts.length === 0) {
-      console.log('Contacts not found');
-      return res.status(404).json({ message: 'Contacts not found' });
-    }
-
-    // Loop through each contact to update the template
-    const updatedTemplates = contacts.map(contact => {
-      // Create a map of contact attributes (key-value pairs)
-      const attributeMap = {};
-      contact.contactAttributes.forEach(attr => {
-        attributeMap[attr.key] = attr.value;  // store attribute key and value pair
-      });
-
-      // Make a deep copy of the template to avoid mutating the original
-      const updatedTemplate = JSON.parse(JSON.stringify(template));
-
-      // Loop through the components and replace the placeholders with the correct values
-      updatedTemplate.components.forEach(component => {
-        if (component.text) {
-          // Replace placeholders in the text (e.g., {{1}}, {{2}}) with the corresponding contact attributes
-          component.text = component.text.replace(/{{(\d+)}}/g, (match, index) => {
-            // Find the key in the attribute map based on index
-            const attributeKey = component.example && component.example.body_text ? component.example.body_text[0][index - 1] : null;
-            
-            // If the attribute exists in the map, replace the placeholder, otherwise keep it as it is
-            return attributeKey && attributeMap[attributeKey] ? attributeMap[attributeKey] : match;
-          });
-        }
-      });
-
-      return updatedTemplate; // Return the updated template for each contact
-    });
-
-    // You can save these updated templates to a database, send them, or process them further here.
-    // For this example, let's just return them in the response.
-    res.status(201).json({
-      message: "Contacts successfully retrieved and templates updated",
-      data: updatedTemplates
+    const { userId,broadcastName,templateId ,contactId,scheduleTime}=req.body
+   const newTask= TemplateSchedule.new(userId,broadcastName,templateId,contactId,scheduleTime)
+    const savedTask= await newTask.save()
+    res.status(200).json({
+      message: "Task saved successfully",
+    
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -369,7 +328,7 @@ const sendMessage = async (req, res) => {
 const updateContact = async (req, res) => {
   try {
     const { _id } = req.params;  // Contact ID from the request parameters
-    const updatedData = req.body; // Data to update in the contact document
+    const updatedData = req.body.updatedData; // Data to update in the contact document
 
     // Optional: Validate that updatedData contains valid fields if needed
     // e.g., if specific fields must exist in updatedData, add checks here
@@ -430,9 +389,9 @@ const deleteContactAttribute = async (req, res) => {
 
 const deleteContact = async (req, res) => {
   try {
-    const { phone } = req.params;
+    const { Id } = req.params;
 
-    const deletedContact = await Contact.findOneAndDelete({ phone });
+    const deletedContact = await Contact.findOneAndDelete({ _id:Id});
     if (!deletedContact) {
       return res.status(404).json({ error: 'Contact not found' });
     }
@@ -521,16 +480,16 @@ const getAllContactAttributesByUserId = async (req, res) => {
 
 const getAllUniqueAttributes = async (req, res) => {
   try {
-    // Retrieve all key attributes from the KeyAttribute model
-    const uniqueAttributes = await KeyAttribute.find({}).select('key value');
+    const { userId } = req.params; // assuming userId is provided as a route parameter
+    console.log(userId)
+    const uniqueAttributes = await Contact.aggregate([
+      { $match: { userId: new mongoose.Types.ObjectId(userId) } }, // Match documents with the given userId
+      { $unwind: "$contactAttributes" }, // Unwind the contactAttributes array
+      { $group: { _id: null, uniqueKeys: { $addToSet: "$contactAttributes.key" } } }, // Group to get unique keys
+      { $project: { _id: 0, uniqueKeys: 1 } } // Project only the uniqueKeys array
+    ]);
 
-    // Check if no attributes are found
-    if (uniqueAttributes.length === 0) {
-      return res.status(404).json({ message: 'No unique attributes found' });
-    }
-
-    // Return the list of unique attributes
-    res.status(200).json({ uniqueAttributes });
+    res.status(200).json(uniqueAttributes.length ? uniqueAttributes[0].uniqueKeys : []);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -597,6 +556,19 @@ const deleteBroadcast = async (req, res) => {
     return res.status(500).json({ message: 'Error deleting broadcast', error: error.message });
   }
 };
+const getBroadcast = async (req, res) => {
+  const { userId } = req.params;
+  try {
+    const broadcast = await TemplateSchedule.find({userId,
+      status:"scheduled"} );
+    if (!broadcast) {
+      return res.status(404).json({ message: 'Broadcast not found' });
+    }
+    res.status(200).json(broadcast);
+    } catch (error) {
+    res.status(500).json({ message: 'Error fetching broadcast', error: error.message });
+    }
+}
 
 
 
@@ -619,6 +591,7 @@ module.exports = {
   getAllUniqueAttributes,
   updateBroadcast,
   deleteBroadcast,
-  createContactsBulk
+  createContactsBulk,
+  getBroadcast
 };
 

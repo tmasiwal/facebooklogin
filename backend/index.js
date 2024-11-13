@@ -199,7 +199,7 @@ cron.schedule("* * * * *", async () => {
 
       // let result = await sendMessagesToSelectedContacts(
       //   broadcast.templateId,
-      //   broadcast.contactIds,
+      //   broadcast.contactId,
       //   broadcast.attributes
       // );
       if (result) {
