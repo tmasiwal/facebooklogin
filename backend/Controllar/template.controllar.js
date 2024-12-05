@@ -8,6 +8,7 @@ const axios = require('axios');
 const TemplateSchedule = require('../Model/TemplateSchedule.model');
 const Contact = require('../Model/contact.model');
 const {User}= require("../Model/user.model")
+const mongoose = require('mongoose');
 const getTemplateAnalytics = async (req, res) => {
   try {
     // Extract start, end, and template_ids from query parameters
@@ -124,17 +125,6 @@ const createContact = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Validate and save unique contact attributes
-    const existingKeys = await KeyAttribute.find({ key: { $in: contactAttributes.map(attr => attr.key) } }).select('key');
-    const existingKeysSet = new Set(existingKeys.map(attr => attr.key));
-
-    const newAttributes = contactAttributes.filter(attr => !existingKeysSet.has(attr.key));
-    
-    // Save new key attributes
-    if (newAttributes.length > 0) {
-      await KeyAttribute.insertMany(newAttributes);
-    }
-
     const contact = new Contact({
       userId,
       name,
@@ -150,30 +140,70 @@ const createContact = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+const createContactsBulk = async (req, res) => {
+  try {
+    const { userId, contacts } = req.body; // Expecting an array of contacts
+
+    // Ensure the user exists
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+  
+    const newContacts = [];
+
+    for (const contact of contacts) {
+      // Validate contact data
+      const { name, phone, broadcast, sms, contactAttributes } = contact;
+
+
+      // Prepare the contact for saving
+      newContacts.push({
+        userId,
+        name,
+        phone,
+        broadcast,
+        sms,
+        contactAttributes
+      });
+    }
+
+    // Save all new contacts at once
+    await Contact.insertMany(newContacts);
+
+    res.status(201).json({ message: "Contacts created successfully" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
 
 
 
 
 const scheduleTemplate = async (req, res) => {
   try {
-    const { userId, broadcastName, templateId, contact, scheduleTime,contactAttributes } = req.body;
+    const { userId,broadcastName,templateId ,contactId,scheduleTime,attributes}=req.body
+   const newTask=  new TemplateSchedule({
+    userId,
+    broadcastName,
+    templateId,
+    contactId,
+    scheduleTime,
+    attributes
+  });
 
-    const newSchedule = new TemplateSchedule({
-      userId,
-      broadcastName,
-      templateId: templateId, 
-      contact:contact, 
-      contactAttributes:contactAttributes,                   
-      scheduleTime: scheduleTime
+    const savedTask= await newTask.save()
+    res.status(200).json({
+      message: "Task saved successfully",
+    
     });
-
-    await newSchedule.save();
-
-    res.status(201).json({"message":"contact scheduleTemplate succesfully"});
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
+
+
 
 const createTemplate = async (req, res) => {
   const payload = req.body;
@@ -305,22 +335,36 @@ const sendMessage = async (req, res) => {
 
 const updateContact = async (req, res) => {
   try {
-    const { _id } = req.params;
-    const updatedData = req.body;
-    console.log(updatedData,_id)
+    const { _id } = req.params;  // Contact ID from the request parameters
+    const updatedData = req.body.updatedData; // Data to update in the contact document
 
+    // Optional: Validate that updatedData contains valid fields if needed
+    // e.g., if specific fields must exist in updatedData, add checks here
+    
+    console.log('Updating contact with ID:', _id);
+    console.log('Updated Data:', updatedData);
 
-    const updatedContact = await Contact.findOneAndUpdate({ _id:_id }, updatedData, { new: true });
+    // Perform the update operation
+    const updatedContact = await Contact.findOneAndUpdate(
+      { _id }, 
+      { $set: updatedData }, 
+      { new: true, runValidators: true }
+    );
 
+    // If no contact is found with the given _id, return an error
     if (!updatedContact) {
       return res.status(404).json({ error: 'Contact not found' });
     }
 
+    // Return the updated contact
     res.status(200).json(updatedContact);
   } catch (error) {
+    // Handle errors and return a meaningful response
+    console.error('Error updating contact:', error);
     res.status(500).json({ error: error.message });
   }
 };
+
 
 const deleteContactAttribute = async (req, res) => {
   try {
@@ -353,9 +397,9 @@ const deleteContactAttribute = async (req, res) => {
 
 const deleteContact = async (req, res) => {
   try {
-    const { phone } = req.params;
+    const { Id } = req.params;
 
-    const deletedContact = await Contact.findOneAndDelete({ phone });
+    const deletedContact = await Contact.findOneAndDelete({ _id:Id});
     if (!deletedContact) {
       return res.status(404).json({ error: 'Contact not found' });
     }
@@ -444,16 +488,16 @@ const getAllContactAttributesByUserId = async (req, res) => {
 
 const getAllUniqueAttributes = async (req, res) => {
   try {
-    // Retrieve all key attributes from the KeyAttribute model
-    const uniqueAttributes = await KeyAttribute.find({}).select('key value');
+    const { userId } = req.params; // assuming userId is provided as a route parameter
+    console.log(userId)
+    const uniqueAttributes = await Contact.aggregate([
+      { $match: { userId: new mongoose.Types.ObjectId(userId) } }, // Match documents with the given userId
+      { $unwind: "$contactAttributes" }, // Unwind the contactAttributes array
+      { $group: { _id: null, uniqueKeys: { $addToSet: "$contactAttributes.key" } } }, // Group to get unique keys
+      { $project: { _id: 0, uniqueKeys: 1 } } // Project only the uniqueKeys array
+    ]);
 
-    // Check if no attributes are found
-    if (uniqueAttributes.length === 0) {
-      return res.status(404).json({ message: 'No unique attributes found' });
-    }
-
-    // Return the list of unique attributes
-    res.status(200).json({ uniqueAttributes });
+    res.status(200).json(uniqueAttributes.length ? uniqueAttributes[0].uniqueKeys : []);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -520,6 +564,22 @@ const deleteBroadcast = async (req, res) => {
     return res.status(500).json({ message: 'Error deleting broadcast', error: error.message });
   }
 };
+const getBroadcast = async (req, res) => {
+  const { userId } = req.params;
+  try {
+    const broadcast = await TemplateSchedule.find({userId,
+      status:"scheduled"} );
+    if (!broadcast) {
+      return res.status(404).json({ message: 'Broadcast not found' });
+    }
+    res.status(200).json(broadcast);
+    } catch (error) {
+    res.status(500).json({ message: 'Error fetching broadcast', error: error.message });
+    }
+}
+
+
+
 module.exports = {
   createTemplate,
   scheduleTemplate,
@@ -538,6 +598,8 @@ module.exports = {
   getAllContactAttributesByUserId,
   getAllUniqueAttributes,
   updateBroadcast,
-  deleteBroadcast
+  deleteBroadcast,
+  createContactsBulk,
+  getBroadcast
 };
 

@@ -10,7 +10,7 @@ const generateToken = (id) => {
 // Create data
 const Login=async (req, res) => {
   try {
-    const newData = new Data(req.body);
+    const newData = new User(req.body);
     await newData.save();
     res.status(200).json(newData);
   } catch (err) {
@@ -20,11 +20,11 @@ const Login=async (req, res) => {
 // Create data
 const Update= async (req, res) => {
   try {
-    const user = await Data.findOne({ username: req.body.username });
+    const user = await User.findOne({ username: req.body.username });
     console.log(user);
     if (user) {
       if (req.body.password == user.password) {
-        await Data.updateOne(
+        await User.updateOne(
           { username: user.username },
           { data: req.body.data }
         );
@@ -44,7 +44,7 @@ const Update= async (req, res) => {
 const Clients= async (req, res) => {
   const { username, password } = req.query;
   try {
-    const allData = await Data.findOne({ username: username });
+    const allData = await User.findOne({ username: username });
     res.status(200).json(allData);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -114,4 +114,6 @@ const loginUser = async (req, res) => {
 
 
 
+
 module.exports={Login,Update,Clients,registerUser,loginUser}
+
