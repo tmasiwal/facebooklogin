@@ -52,49 +52,66 @@ const Clients= async (req, res) => {
 };
 
 const registerUser = async (req, res) => {
-  const { name, email, password } = req.body;
-  
+  const { username, email, password } = req.body;
+
   try {
-      const userExists = await User.findOne({ email });
-      if (userExists) {
-          return res.status(400).json({ message: 'User already exists' });
-      }
-      
-      const user = await User.create({
-          name,
-          email,
-          password
-      });
-      
-      res.status(201).json({
-          _id: user._id,
-          name: user.name,
-          email: user.email,
-      });
+    // Check if email or username already exists
+    const emailExists = await User.findOne({ email });
+    const usernameExists = await User.findOne({ username });
+
+    if (emailExists) {
+      return res.status(400).json({ message: 'Email already exists' });
+    }
+
+    if (usernameExists) {
+      return res.status(400).json({ message: 'Username already exists' });
+    }
+
+    // Create a new user
+    const user = await User.create({
+      username,
+      email,
+      password,
+    });
+
+    res.status(201).json({
+      _id: user._id,
+      username: user.username,
+      email: user.email,
+    });
   } catch (error) {
-      res.status(500).json({ message: 'Error registering user', error });
+    console.error("Error during registration:", error);
+    res.status(500).json({ message: 'Error registering user', error });
   }
 };
+
 
 const loginUser = async (req, res) => {
-  const { email, password } = req.body;
+  const { identifier, password } = req.body;
 
   try {
-      const user = await User.findOne({ email });
-      
-      if (user && (await user.matchPassword(password))) {
-          res.json({
-              _id: user._id,
-              name: user.name,
-              email: user.email,
-              token: generateToken(user._id),  // Send the JWT token in the response
-          });
-      } else {
-          res.status(401).json({ message: 'Invalid email or password' });
-      }
+    // Find the user by email or username
+    const user = await User.findOne({
+      $or: [{ email: identifier }, { username: identifier }],
+    });
+
+    if (user && (await user.matchPassword(password))) {
+      const userResponse = { ...user._doc }; // Extract the Mongoose document
+      delete userResponse.password;
+
+      res.status(200).json({
+        ...userResponse,
+        token: generateToken(user._id), // Include the JWT token
+      });
+    } else {
+      res.status(401).json({ message: "Invalid email/username or password" });
+    }
   } catch (error) {
-      res.status(500).json({ message: 'Error logging in user', error });
+    console.error("Error during login:", error);
+    res.status(500).json({ message: "Error logging in user", error });
   }
 };
+
+
 
 module.exports={Login,Update,Clients,registerUser,loginUser}

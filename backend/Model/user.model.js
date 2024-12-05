@@ -14,10 +14,12 @@ const bcrypt = require('bcrypt');
 
 // User Schema
 const userSchema = new mongoose.Schema({
-    name: { type: String, required: true },
+    username: { type: String, required: true, unique: true },
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
-    data: { type: Object},
+    phone_number_id: { type: Number},
+    waba_id: { type: Number},
+    tech_partner: { type: String},
 }, { timestamps: true });
 
 // Password Hashing
