@@ -135,20 +135,12 @@ console.log(Ids)
         }
       } else if (component.type === "BODY" && attributes.body) {
         // Replace placeholders in the body text (e.g., {{1}}, {{2}})
-        let bodyText = component.text;
-        const bodyValues = attributes.body.map((key) =>
-          getAttributeValue(key, [...attributes.body])
-        );
-
-        bodyValues.forEach((value, index) => {
-          const placeholder = `{{${index + 1}}}`;
-          bodyText = bodyText.replace(placeholder, value);
-        });
-
+        const bodyParams = attributes.body.map(text => ({ type: 'text', text }));
         payload.template.components.push({
-          type: "body",
-          parameters: [{ type: "text", text: bodyText }],
+          type: 'body',
+          parameters: bodyParams,
         });
+      
       }
     });
 
