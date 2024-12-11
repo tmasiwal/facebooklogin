@@ -173,7 +173,7 @@ console.log(Ids)
     const newMessage = new MessageModel({
       phone_number_id: Ids.phone_number_id, 
       direction: 'sent', 
-      waba_id:Ids.wa_id,
+      waba_id:Ids.waba_id,
       to: payload.to, 
       id: message.id, 
       timestamp: Date.now(),
