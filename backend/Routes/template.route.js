@@ -98,7 +98,8 @@ templateRouter.post('/uploadfile', upload.single('file'), async (req, res) => {
 });
 
 
-templateRouter.get('/template_analytics', templateController.getTemplateAnalytics);
+templateRouter.post('/template_analytics', templateController.getTemplateAnalytics);
+templateRouter.post('/broadcast_analytics', templateController.get7DaysAnalyticsFromSchedule);
 templateRouter.get('/message_templates', templateController.getMessageTemplates);
 templateRouter.get('/analytics', templateController.getAnalytics);
 templateRouter.get('/contacts', templateController.getAllContacts);

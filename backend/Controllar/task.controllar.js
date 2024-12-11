@@ -41,6 +41,7 @@ const CanceleTask = async (req, res) => {
 
 const axios = require("axios");
 const Contact = require("../Model/contact.model"); // Adjust this path
+const MessageModel = require("../Model/message.model");
 
 // Function to fetch the template only once
 async function fetchTemplate(templateId) {
@@ -70,8 +71,11 @@ async function sendDynamicWhatsAppMessage(
   recipientPhone,
   templateData,
   attributes,
-  contactAttributes
+  contactAttributes,
+  Ids,
+  broadcastId
 ) {
+ 
   try {
     const { name, language, components } = templateData;
 
@@ -151,17 +155,35 @@ async function sendDynamicWhatsAppMessage(
     // Send the request to the Interakt API
     console.log("Final Payload:", JSON.stringify(payload, null, 2));
     const response = await axios.post(
-      "https://amped-express.interakt.ai/api/v17.0/425551820647436/messages",
+      `https://amped-express.interakt.ai/api/v17.0/${Ids.phone_number_id}/messages`,
       payload,
       {
         headers: {
           "x-access-token": "7SFRQSvyqow0hNMOGRkzSAoA5Prwh6JU",
-          "x-waba-id": "310103775524526",
+          "x-waba-id": Ids.wa_id,
           "Content-Type": "application/json",
         },
       }
     );
-
+    const { contacts, messages } = response.data;
+    const contact = contacts[0]; // Assuming you have only one contact in the array
+    const message = messages[0]; // Assuming you have only one message in the array
+  
+    // Create a new message entry in the database
+    const newMessage = new MessageModel({
+      phone_number_id: Ids.phone_number_id, 
+      direction: 'sent', 
+      waba_id:Ids.wa_id,
+      to: payload.to, 
+      id: message.id, 
+      timestamp: Date.now(),
+      status: 'sent', 
+      failure_reason: null, 
+      broadcastId:broadcastId,
+    });
+  
+    // Save the message to the database
+    await newMessage.save();
     console.log(`Message sent successfully to ${recipientPhone}`);
   } catch (error) {
     console.error(
@@ -175,20 +197,16 @@ async function sendDynamicWhatsAppMessage(
 async function sendMessagesToSelectedContacts(
   templateId,
   contactIds,
-  attributes
+  attributes,
+  Ids,
+  broadcastId
 ) {
   try {
     // Fetch the template once
     const templateData = await fetchTemplate(templateId);
     console.log("Template fetched successfully:", templateData.name);
 
-    // Fetch all contacts for the given IDs
-    // const contacts = await Contact.find({ _id: { $in: contactIds } });
 
-    // if (contacts.length === 0) {
-    //   console.log('No contacts found for the provided IDs.');
-    //   return;
-    // }
 
     for (const contactid of contactIds) {
       const contact = await Contact.findById(contactid);
@@ -206,11 +224,14 @@ async function sendMessagesToSelectedContacts(
         phone,
         templateData,
         attributes,
-        attributeMap
+        attributeMap,
+        Ids,
+        broadcastId
       );
     }
 
     console.log("All messages sent successfully.");
+    return true;
   } catch (error) {
     console.error("Error sending messages:", error.message);
   }

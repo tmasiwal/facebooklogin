@@ -40,11 +40,11 @@ const Data = mongoose.model("onboarding", dataSchema);
 // Routes
 const userRouter = require("./Routes/user.router");
 const taskRouter = require("./Routes/task.router");
-const templateRouter = require("./Routes/template.route");
+ const templateRouter = require("./Routes/template.route");
 const { sendMessagesToSelectedContacts } = require("./Controllar/task.controllar");
 app.use("/user", userRouter);
 app.use("/task", taskRouter);
-app.use("/template", templateRouter);
+ app.use("/template", templateRouter);
 // Create data
 
 app.post("/login", async (req, res) => {
@@ -111,7 +111,50 @@ app.post("/tp_signup", async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
+app.get("/askFunduwebhook/:phoneId", async (req, res) => {
+  const phoneId = req.params.phoneId;
+  const mode = req.query["hub.mode"];
+  const challenge = req.query["hub.challenge"];
+  const verify_token = req.query["hub.verify_token"];
 
+  if (mode === "subscribe" && verify_token === `VERIFY_TOKEN$-${phoneId}`) {
+    res.status(200).send(challenge);
+  } else {
+    res.status(403).send("Invalid verification token");
+  }
+});
+
+app.post("/askFunduwebhook/:phoneId", async (req, res) => {
+  try {
+    const data = req.body;
+    const phoneId = req.params.phoneId;
+    console.log("Phone ID:", phoneId);
+    // Logging the received data
+    console.log("Received data:", JSON.stringify(data, null, 2));
+
+    // Validate the structure of the incoming data
+    if (data.entry && data.entry[0]?.changes?.[0]?.value) {
+      const messages = data.entry[0].changes[0].value.messages;
+      const phone_number_id = data.entry[0].changes[0].value.metadata.phone_number_id;
+
+      // Log the extracted data
+      console.log("Phone Number ID:", phone_number_id);
+      console.log("Messages:", messages);
+
+      // Example: Set default language
+      let language = "english";
+
+      // Additional logic can be added here
+    } else {
+      console.error("Invalid data structure received");
+    }
+
+    res.status(200).send({ message: "Data processed successfully" });
+  } catch (error) {
+    console.error("Error processing data:", error);
+    res.status(500).send({ error: "Internal Server Error" });
+  }
+});
 async function sendWhatsAppMessage(contact, messageBody) {
   const payload = {
     messaging_product: "whatsapp",
@@ -173,7 +216,10 @@ cron.schedule("* * * * *", async () => {
     const broadcasts = await TemplateSchedule.find({
       status: "scheduled",
       scheduleTime: formatDateToIST(now),
-    });
+    }).populate({
+      path: "userId", // Populate the `userId` field
+      select: "phone_number_id waba_id", // Select specific fields from the User model
+    });;
 
     console.log(broadcasts);
     if (broadcasts.length === 0) {
@@ -183,22 +229,8 @@ cron.schedule("* * * * *", async () => {
 
     // Loop through each broadcast
     for (const broadcast of broadcasts) {
-      /// Example usage
-      // const templateId = "1308823763449725";
-      // const contactIds = [
-      //   "66dfcbc855f7ef388357b287",
-      //   "66dc0462fb45e45d4986bd1b",
-      // ]; // Replace with actual contact IDs
-      // const attributes = {
-      //   header: [
-      //     "https://brodcastwatsapp.blob.core.windows.net/tempateimage/newvdeo.mp4",
-      //   ], // Header key or default value
 
-      //   // Body keys or default values
-      //   body: ["Pankaj"],
-      // };
-       
-       let result = await sendMessagesToSelectedContacts(broadcast.templateId, broadcast.contactId, broadcast.attributes)
+       let result = await sendMessagesToSelectedContacts(broadcast.templateId, broadcast.contactId, broadcast.attributes,broadcast.userId,broadcast._id)
       if (result) {
         broadcast.status = "completed";
         await broadcast.save();

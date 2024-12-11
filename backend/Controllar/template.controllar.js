@@ -12,7 +12,7 @@ const mongoose = require('mongoose');
 const getTemplateAnalytics = async (req, res) => {
   try {
     // Extract start, end, and template_ids from query parameters
-    const { start, end, template_ids } = req.query;
+    const { start, end, template_ids ,wabaID} = req.body;
 
     // Ensure the necessary query parameters are provided
     if (!start || !end || !template_ids) {
@@ -20,14 +20,14 @@ const getTemplateAnalytics = async (req, res) => {
     }
 
     // Make the GET request to the external API
-    const response = await axios.get(`https://interakt-amped-express.azurewebsites.net/api/v17.0/${process.env.WABA_ID}`, {
+    const response = await axios.get(`https://amped-express.interakt.ai/api/v17.0/${wabaID}`, {
       params: {
         fields: `template_analytics.start(${start}).end(${end}).granularity(DAILY).template_ids(${template_ids})`,
       },
       headers: {
-        'x-waba-id': process.env.WABA_ID,
+        'x-waba-id': wabaID,
         'Content-Type': 'application/json',
-        'x-access-token': process.env.ACCESS_TOKEN,
+        'x-access-token': "7SFRQSvyqow0hNMOGRkzSAoA5Prwh6JU",
       }
     });
 
@@ -58,7 +58,7 @@ const getTemplateAnalytics = async (req, res) => {
     });
 
   } catch (error) {
-    console.log('Error fetching template analytics:', error.message);
+    console.log('Error fetching template analytics:', error);
     res.status(500).send({ message: 'Internal server error' });
   }
 };
@@ -240,7 +240,7 @@ const getMessageTemplates = async (req, res) => {
 
   try {
     const response = await axios.get(
-      `https://interakt-amped-express.azurewebsites.net/api/v17.0/${wabaID}/message_templates`,
+      `https://amped-express.interakt.ai/api/v17.0/${wabaID}/message_templates`,
       {
         headers: {
           "x-access-token": x_access_token,
@@ -577,7 +577,76 @@ const getBroadcast = async (req, res) => {
     res.status(500).json({ message: 'Error fetching broadcast', error: error.message });
     }
 }
+const get7DaysAnalyticsFromSchedule = async (req, res) => {
+  const { userId ,wabaID} = req.query;
+// console.log(userId,wabaID)
+  try {
+    // Fetch all broadcasts for the given user
+    const broadcasts = await TemplateSchedule.find({ userId });
 
+    if (!broadcasts || broadcasts.length === 0) {
+      return res.status(404).json({ message: "No broadcasts found" });
+    }
+
+    // Map broadcasts to their analytics
+    const analyticsPromises = broadcasts.map(async (broadcast) => {
+      const startTimestamp = Math.floor(new Date(broadcast.scheduleTime).getTime() / 1000);
+      const currentTimestamp = Math.floor(new Date().getTime() / 1000);
+      const endTimestamp = Math.min(startTimestamp + 7 * 24 * 60 * 60, currentTimestamp); // 7 days in seconds
+// console.log(startTimestamp,endTimestamp,broadcast.templateId)
+      // Fetch analytics for the broadcast's template
+     
+      const response = await axios.get(`https://amped-express.interakt.ai/api/v17.0/${wabaID}`, {
+        params: {
+          fields: `template_analytics.start(${startTimestamp}).end(${endTimestamp}).granularity(DAILY).template_ids([${broadcast.templateId}])`,
+        },
+        headers: {
+          'x-waba-id': wabaID,
+          'Content-Type': 'application/json',
+          'x-access-token': "7SFRQSvyqow0hNMOGRkzSAoA5Prwh6JU",
+        }
+      });
+// response.data?.data?.[0]?.data_points || []
+      const analyticsData = response.data?.template_analytics.data?.[0]?.data_points || [];
+// console.log(analyticsData,"analytics")
+      let sent = 0,
+        delivered = 0,
+        read = 0,
+        replied = 0;
+        const recipients = broadcast.contactId.length; 
+      // Aggregate metrics for the 7-day window
+      analyticsData.forEach((day) => {
+        sent += Math.min(day.sent || 0, recipients - sent); // Cap sent to recipients
+        delivered += Math.min(day.delivered || 0, recipients - delivered); // Cap delivered to recipients
+        read += Math.min(day.read || 0, recipients - read); // Cap read to recipients
+        replied += Math.min(
+          day.clicked?.reduce((sum, click) => sum + (click.count || 0), 0) || 0,
+          recipients - replied
+        ); // Cap replied to recipients
+      });
+
+      return {
+        broadcastName: broadcast.broadcastName,
+        scheduled: broadcast.scheduleTime,
+        successful: sent,
+        read,
+        replied,
+        recipients,
+        failed: sent - delivered, // Assuming failed is sent minus delivered
+        status: broadcast.status,
+      };
+    });
+
+
+    // Wait for all analytics to resolve
+    const results = await Promise.all(analyticsPromises);
+
+    res.status(200).json(results);
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: "Error fetching analytics", error: error.message });
+  }
+};
 
 
 module.exports = {
@@ -600,6 +669,12 @@ module.exports = {
   updateBroadcast,
   deleteBroadcast,
   createContactsBulk,
-  getBroadcast
+  getBroadcast,
+  get7DaysAnalyticsFromSchedule
 };
 
+
+// phone_number_id
+// "425551820647436"
+// waba_id
+// "310103775524526"

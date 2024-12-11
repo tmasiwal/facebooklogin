@@ -18,27 +18,46 @@ const Login=async (req, res) => {
   }
 };
 // Create data
-const Update= async (req, res) => {
+const UpdateUserData = async (req, res) => {
+  const { identifier, password ,phone_number_id, waba_id,tech_partner} = req.body;
+
   try {
-    const user = await User.findOne({ username: req.body.username });
-    console.log(user);
+    // Search for the user by username or email
+    const user = await User.findOne({
+      $or: [{ username: identifier }, { email: identifier }],
+    });
+
     if (user) {
-      if (req.body.password == user.password) {
+      // Check if the provided password matches the stored password
+      const isPasswordCorrect = await user.matchPassword(password);
+
+      if (isPasswordCorrect) {
+        // Define the values for the fields you want to set
+        const updateFields = {
+          waba_id   ,    
+          phone_number_id, 
+          tech_partner,                 
+        };
+
+        // Perform the update
         await User.updateOne(
-          { username: user.username },
-          { data: req.body.data }
+          { _id: user._id }, // Use _id to update the specific user
+          { $set: updateFields } // Update the fields
         );
-        res.status(200).json({ message: "success" });
+
+        res.status(200).json({ message: "User data updated successfully." });
       } else {
-        res.status(404).json({ message: "Wrong username or password" });
+        res.status(401).json({ message: "Incorrect password" });
       }
     } else {
-      res.status(400).json({ message: "no user found please Register first!" });
+      res.status(404).json({ message: "User not found. Please register first." });
     }
   } catch (err) {
-    res.status(400).json({ message: err.message });
+    console.error(err);
+    res.status(500).json({ message: "Error updating user data", error: err.message });
   }
 };
+
 
 // Get all data
 const Clients= async (req, res) => {
@@ -115,5 +134,5 @@ const loginUser = async (req, res) => {
 
 
 
-module.exports={Login,Update,Clients,registerUser,loginUser}
+module.exports={Login,UpdateUserData,Clients,registerUser,loginUser}
 

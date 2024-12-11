@@ -10,12 +10,10 @@ const TemplateScheduleSchema = new mongoose.Schema({
     required: true,
   },
   contactId: [{ type: String, required: true }],
-  attributes: [
-    {
-      key: { type: String}, 
-      value: { type: [{ type: String}]}, 
-    },
-  ],
+  attributes: {
+    header: { type: [String], default: [] }, // Array of strings for header
+    body: { type: [String], default: [] },   // Array of strings for body
+  },
   scheduleTime: { type: String, required: true },
   status: {
     type: String,
