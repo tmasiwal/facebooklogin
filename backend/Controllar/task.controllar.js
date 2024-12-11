@@ -78,7 +78,7 @@ async function sendDynamicWhatsAppMessage(
  
   try {
     const { name, language, components } = templateData;
-
+console.log(Ids)
     // Prepare the base payload
     const payload = {
       messaging_product: "whatsapp",
@@ -186,6 +186,7 @@ async function sendDynamicWhatsAppMessage(
     await newMessage.save();
     console.log(`Message sent successfully to ${recipientPhone}`);
   } catch (error) {
+    console.log(error)
     console.error(
       `Error sending message to ${recipientPhone}:`,
       error.response?.data || error.message
