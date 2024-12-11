@@ -160,7 +160,7 @@ console.log(Ids)
       {
         headers: {
           "x-access-token": "7SFRQSvyqow0hNMOGRkzSAoA5Prwh6JU",
-          "x-waba-id": Ids.wa_id,
+          "x-waba-id": Ids.waba_id,
           "Content-Type": "application/json",
         },
       }
