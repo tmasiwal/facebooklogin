@@ -42,6 +42,7 @@ const userRouter = require("./Routes/user.router");
 const taskRouter = require("./Routes/task.router");
  const templateRouter = require("./Routes/template.route");
 const { sendMessagesToSelectedContacts } = require("./Controllar/task.controllar");
+const { handleMessageChange } = require("./Controllar/message.controllar");
 app.use("/user", userRouter);
 app.use("/task", taskRouter);
  app.use("/template", templateRouter);
@@ -129,24 +130,14 @@ app.post("/askFunduwebhook/:phoneId", async (req, res) => {
     const data = req.body;
     const phoneId = req.params.phoneId;
     console.log("Phone ID:", phoneId);
-    // Logging the received data
     console.log("Received data:", JSON.stringify(data, null, 2));
 
-    // Validate the structure of the incoming data
-    if (data.entry && data.entry[0]?.changes?.[0]?.value) {
-      const messages = data.entry[0].changes[0].value.messages;
-      const phone_number_id = data.entry[0].changes[0].value.metadata.phone_number_id;
-
-      // Log the extracted data
-      console.log("Phone Number ID:", phone_number_id);
-      console.log("Messages:", messages);
-
-      // Example: Set default language
-      let language = "english";
-
-      // Additional logic can be added here
+    if (data.entry && data.entry[0]?.changes?.[0]?.value?.statuses) {
+      // Handle the message change
+     
+      await handleMessageChange(data);
     } else {
-      console.error("Invalid data structure received");
+      console.error("Invalid or unsupported data structure received");
     }
 
     res.status(200).send({ message: "Data processed successfully" });
@@ -155,6 +146,7 @@ app.post("/askFunduwebhook/:phoneId", async (req, res) => {
     res.status(500).send({ error: "Internal Server Error" });
   }
 });
+
 async function sendWhatsAppMessage(contact, messageBody) {
   const payload = {
     messaging_product: "whatsapp",

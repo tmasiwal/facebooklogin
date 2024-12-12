@@ -45,7 +45,10 @@ status: {
     type: String,
     default: null,
   },
-
+  metadata: {
+    type: Map,
+    of: String,
+  },
   
 });
 
