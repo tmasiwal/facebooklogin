@@ -585,12 +585,13 @@ const getBroadcastStatistics = async (req, res) => {
     // Extract pagination parameters from query
     const page = parseInt(req.query.page) || 1; // Default to page 1
     const limit = parseInt(req.query.limit) || 5; // Default to 5 records per page
+    const userId= req.query.userId
 
     // Calculate skip value for pagination
     const skip = (page - 1) * limit;
 
     // Fetch broadcasts with pagination, sorted by scheduleTime in descending order
-    const broadcasts = await TemplateSchedule.find()
+    const broadcasts = await TemplateSchedule.find({userId})
       .sort({ scheduleTime: -1 })
       .skip(skip)
       .limit(limit);
