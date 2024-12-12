@@ -9,6 +9,9 @@ const TemplateSchedule = require('../Model/TemplateSchedule.model');
 const Contact = require('../Model/contact.model');
 const {User}= require("../Model/user.model")
 const mongoose = require('mongoose');
+const MessageModel = require('../Model/message.model');
+
+
 const getTemplateAnalytics = async (req, res) => {
   try {
     // Extract start, end, and template_ids from query parameters
@@ -577,74 +580,86 @@ const getBroadcast = async (req, res) => {
     res.status(500).json({ message: 'Error fetching broadcast', error: error.message });
     }
 }
-const get7DaysAnalyticsFromSchedule = async (req, res) => {
-  const { userId ,wabaID} = req.query;
-// console.log(userId,wabaID)
+const getBroadcastStatistics = async (req, res) => {
   try {
-    // Fetch all broadcasts for the given user
-    const broadcasts = await TemplateSchedule.find({ userId });
+    // Extract pagination parameters from query
+    const page = parseInt(req.query.page) || 1; // Default to page 1
+    const limit = parseInt(req.query.limit) || 5; // Default to 5 records per page
 
-    if (!broadcasts || broadcasts.length === 0) {
-      return res.status(404).json({ message: "No broadcasts found" });
-    }
+    // Calculate skip value for pagination
+    const skip = (page - 1) * limit;
 
-    // Map broadcasts to their analytics
-    const analyticsPromises = broadcasts.map(async (broadcast) => {
-      const startTimestamp = Math.floor(new Date(broadcast.scheduleTime).getTime() / 1000);
-      const currentTimestamp = Math.floor(new Date().getTime() / 1000);
-      const endTimestamp = Math.min(startTimestamp + 7 * 24 * 60 * 60, currentTimestamp); // 7 days in seconds
-// console.log(startTimestamp,endTimestamp,broadcast.templateId)
-      // Fetch analytics for the broadcast's template
-     
-      const response = await axios.get(`https://amped-express.interakt.ai/api/v17.0/${wabaID}`, {
-        params: {
-          fields: `template_analytics.start(${startTimestamp}).end(${endTimestamp}).granularity(DAILY).template_ids([${broadcast.templateId}])`,
-        },
-        headers: {
-          'x-waba-id': wabaID,
-          'Content-Type': 'application/json',
-          'x-access-token': "7SFRQSvyqow0hNMOGRkzSAoA5Prwh6JU",
+    // Fetch broadcasts with pagination, sorted by scheduleTime in descending order
+    const broadcasts = await TemplateSchedule.find()
+      .sort({ scheduleTime: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    const totalBroadcasts = await TemplateSchedule.countDocuments(); // Total number of broadcasts
+
+    // Process each broadcast to calculate statistics
+    const statistics = await Promise.all(
+      broadcasts.map(async (broadcast) => {
+        const { _id, broadcastName, scheduleTime, status, contactId } = broadcast;
+
+        // Initialize counts
+        let successful = 0, read = 0, replied = 0, failed = 0;
+
+        // Handle completed broadcasts
+        if (status === "completed") {
+          const messages = await MessageModel.find({ broadcastId: _id });
+
+          messages.forEach((message) => {
+            if (message.status === "sent") {
+              successful += 1;
+            } else if (message.status === "read") {
+              successful += 1;
+              read += 1;
+            } else if (message.status === "replied") {
+              successful += 1;
+              read += 1;
+              replied += 1;
+            } else if (message.status === "failed") {
+              failed += 1;
+            }
+          });
         }
-      });
-// response.data?.data?.[0]?.data_points || []
-      const analyticsData = response.data?.template_analytics.data?.[0]?.data_points || [];
-// console.log(analyticsData,"analytics")
-      let sent = 0,
-        delivered = 0,
-        read = 0,
-        replied = 0;
-        const recipients = broadcast.contactId.length; 
-      // Aggregate metrics for the 7-day window
-      analyticsData.forEach((day) => {
-        sent += Math.min(day.sent || 0, recipients - sent); // Cap sent to recipients
-        delivered += Math.min(day.delivered || 0, recipients - delivered); // Cap delivered to recipients
-        read += Math.min(day.read || 0, recipients - read); // Cap read to recipients
-        replied += Math.min(
-          day.clicked?.reduce((sum, click) => sum + (click.count || 0), 0) || 0,
-          recipients - replied
-        ); // Cap replied to recipients
-      });
 
-      return {
-        broadcastName: broadcast.broadcastName,
-        scheduled: broadcast.scheduleTime,
-        successful: sent,
-        read,
-        replied,
-        recipients,
-        failed: sent - delivered, // Assuming failed is sent minus delivered
-        status: broadcast.status,
-      };
+        // Handle scheduled broadcasts
+        if (status === "scheduled") {
+          successful = 0;
+          read = 0;
+          replied = 0;
+          failed = 0;
+        }
+
+        // Recipients count is the number of contacts in the broadcast
+        const recipients = contactId.length;
+
+        return {
+          broadcastName,
+          scheduleTime,
+          status,
+          recipients,
+          successful,
+          read,
+          replied,
+          failed,
+        };
+      })
+    );
+
+    // Respond with paginated results
+    res.status(200).json({
+      total: totalBroadcasts,
+      page,
+      limit,
+      totalPages: Math.ceil(totalBroadcasts / limit),
+      statistics,
     });
-
-
-    // Wait for all analytics to resolve
-    const results = await Promise.all(analyticsPromises);
-
-    res.status(200).json(results);
   } catch (error) {
-    console.log(error);
-    res.status(500).json({ message: "Error fetching analytics", error: error.message });
+    console.error("Error fetching broadcast statistics:", error);
+    res.status(500).json({ message: "Failed to fetch broadcast statistics" });
   }
 };
 
@@ -670,7 +685,7 @@ module.exports = {
   deleteBroadcast,
   createContactsBulk,
   getBroadcast,
-  get7DaysAnalyticsFromSchedule
+  getBroadcastStatistics
 };
 
 
